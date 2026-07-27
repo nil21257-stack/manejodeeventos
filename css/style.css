@@ -105,6 +105,15 @@ main{max-width:640px;margin:0 auto;padding:16px 16px 24px;}
 .event-item button{background:none;border:none;color:var(--paper-dim);font-size:15px;padding:4px 6px;flex-shrink:0;}
 .event-item button.ev-delete{color:#E8A6A1;}
 
+.invitation-box{
+  margin:10px 0;background:var(--ink);border:1px solid rgba(201,161,90,.25);border-radius:var(--radius-sm);
+  padding:10px;
+}
+.invitation-box img{width:100%;max-height:220px;object-fit:contain;border-radius:8px;background:#000;display:block;}
+.invitation-actions{display:flex;gap:8px;margin-top:8px;}
+.invitation-actions button{flex:1;padding:8px 0;font-size:12.5px;}
+#invitationOcrText{margin-top:8px;font-family:ui-monospace,monospace;font-size:12.5px;}
+
 #searchInput{
   width:100%;padding:11px 14px;border-radius:999px;border:1px solid rgba(201,161,90,.3);
   background:var(--ink-2);color:var(--paper);font-size:15px;

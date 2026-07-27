@@ -97,10 +97,15 @@
         <span>Documento PDF</span>
         <small>texto seleccionable</small>
       </button>
-      <button class="import-card" data-mode="foto">
+      <button class="import-card" data-mode="camara">
+        <span class="import-icon">📷</span>
+        <span>Tomar foto</span>
+        <small>con la cámara</small>
+      </button>
+      <button class="import-card" data-mode="galeria">
         <span class="import-icon">◎</span>
-        <span>Foto / Escaneo</span>
-        <small>reconoce el texto</small>
+        <span>Desde galería</span>
+        <small>foto que ya tienes</small>
       </button>
       <button class="import-card" data-mode="texto">
         <span class="import-icon">✎</span>
@@ -111,7 +116,8 @@
 
     <input type="file" id="fileExcel" accept=".xlsx,.xls,.csv" class="hidden">
     <input type="file" id="filePdf" accept="application/pdf" class="hidden">
-    <input type="file" id="fileFoto" accept="image/*" class="hidden">
+    <input type="file" id="fileFotoCamera" accept="image/*" capture="environment" class="hidden">
+    <input type="file" id="fileFotoGaleria" accept="image/*" class="hidden">
 
     <div id="importStatus" class="import-status hidden"></div>
 
@@ -241,6 +247,22 @@
     <h3>Ajustes del evento</h3>
     <label>Nombre del evento<input id="settingsEventName" type="text" placeholder="Ej: Boda de Ana y Luis"></label>
     <label>Fecha<input id="settingsEventDate" type="date"></label>
+    <label>Lugar (opcional)<input id="settingsEventLugar" type="text" placeholder="Ej: Salón Las Palmas, Santiago"></label>
+
+    <label>Invitación del evento (opcional)</label>
+    <p class="hint">Sube una foto de la invitación para tenerla a mano y, si quieres, extraer el texto para copiar la fecha o el lugar exactos.</p>
+    <div id="invitationBox" class="invitation-box hidden">
+      <img id="invitationThumb" alt="Invitación del evento">
+      <div class="invitation-actions">
+        <button id="btnOcrInvitation" class="btn-ghost">Leer texto (OCR)</button>
+        <button id="btnRemoveInvitation" class="btn-danger">Quitar</button>
+      </div>
+    </div>
+    <button id="btnUploadInvitation" class="btn-ghost full">📎 Subir imagen de la invitación</button>
+    <input type="file" id="fileInvitation" accept="image/*" class="hidden">
+    <div id="invitationOcrStatus" class="import-status hidden"></div>
+    <textarea id="invitationOcrText" rows="4" class="hidden" placeholder="Texto detectado…" readonly></textarea>
+
     <div class="modal-actions">
       <button id="btnExportBackup" class="btn-ghost">Exportar respaldo</button>
       <button id="btnShareSummary" class="btn-ghost">Compartir resumen</button>

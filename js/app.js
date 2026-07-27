@@ -21,9 +21,10 @@
   function renderHeader() {
     const ev = DB.event;
     $('#eventTitle').textContent = ev.name || 'Mi evento';
-    $('#eventSubtitle').textContent = ev.date
+    const dateStr = ev.date
       ? new Date(ev.date + 'T00:00').toLocaleDateString('es-DO', { day: 'numeric', month: 'long', year: 'numeric' })
       : 'Sin fecha definida';
+    $('#eventSubtitle').textContent = ev.lugar ? `${dateStr} · ${ev.lugar}` : dateStr;
   }
 
   // ---------------- Invitados ----------------
@@ -327,7 +328,7 @@
   $('#btnShareSummary').addEventListener('click', () => {
     const ev = DB.event;
     const tables = DB.tables.slice().sort((a, b) => a.name.localeCompare(b.name, 'es', { numeric: true }));
-    let text = `${ev.name || 'Mi evento'}${ev.date ? ' — ' + ev.date : ''}\n`;
+    let text = `${ev.name || 'Mi evento'}${ev.date ? ' — ' + ev.date : ''}${ev.lugar ? ' — ' + ev.lugar : ''}\n`;
     text += `${DB.guests.length} invitados en ${tables.length} mesas\n\n`;
     tables.forEach(t => {
       const guests = DB.guestsInTable(t.name);
@@ -344,7 +345,7 @@
     const tables = DB.tables.slice().sort((a, b) => a.name.localeCompare(b.name, 'es', { numeric: true }));
     const area = $('#printArea');
     let html = `<div class="print-title">${escapeAttr(ev.name || 'Mi evento')}</div>`;
-    html += `<div class="print-subtitle">${ev.date ? new Date(ev.date + 'T00:00').toLocaleDateString('es-DO', { day: 'numeric', month: 'long', year: 'numeric' }) : ''} — ${DB.guests.length} invitados, ${tables.length} mesas</div>`;
+    html += `<div class="print-subtitle">${ev.date ? new Date(ev.date + 'T00:00').toLocaleDateString('es-DO', { day: 'numeric', month: 'long', year: 'numeric' }) : ''}${ev.lugar ? ' — ' + escapeAttr(ev.lugar) : ''} — ${DB.guests.length} invitados, ${tables.length} mesas</div>`;
     tables.forEach(t => {
       const guests = DB.guestsInTable(t.name).sort((a, b) => a.nombre.localeCompare(b.nombre, 'es'));
       html += `<div class="print-table"><h3>${escapeAttr(t.name)}${t.etiqueta ? ' — ' + escapeAttr(t.etiqueta) : ''}</h3>`;
@@ -500,12 +501,14 @@
   $('#btnSettings').addEventListener('click', () => {
     $('#settingsEventName').value = DB.event.name || '';
     $('#settingsEventDate').value = DB.event.date || '';
+    $('#settingsEventLugar').value = DB.event.lugar || '';
+    renderInvitationBox();
     renderEventsList();
     $('#modalSettings').classList.remove('hidden');
   });
   $('#btnCancelSettings').addEventListener('click', () => $('#modalSettings').classList.add('hidden'));
   $('#btnSaveSettings').addEventListener('click', () => {
-    DB.saveEvent($('#settingsEventName').value, $('#settingsEventDate').value);
+    DB.saveEvent($('#settingsEventName').value, $('#settingsEventDate').value, $('#settingsEventLugar').value);
     $('#modalSettings').classList.add('hidden');
     renderHeader();
     toast('Ajustes guardados');
@@ -553,7 +556,8 @@
       hideImportPanels();
       if (mode === 'excel') $('#fileExcel').click();
       else if (mode === 'pdf') $('#filePdf').click();
-      else if (mode === 'foto') $('#fileFoto').click();
+      else if (mode === 'camara') $('#fileFotoCamera').click();
+      else if (mode === 'galeria') $('#fileFotoGaleria').click();
       else if (mode === 'texto') {
         $('#rawTextArea').value = '';
         $('#importReview').classList.remove('hidden');
@@ -608,10 +612,7 @@
     }
   });
 
-  $('#fileFoto').addEventListener('change', async e => {
-    const file = e.target.files[0];
-    e.target.value = '';
-    if (!file) return;
+  async function handleFotoFile(file) {
     setStatus('Preparando imagen…');
     const withTimeout = (promise, ms, msg) => Promise.race([
       promise,
@@ -635,6 +636,16 @@
       console.error(err);
       setStatus('No se pudo procesar la imagen (tardó demasiado o falló el reconocimiento). Prueba con mejor luz, más cerca del texto, o usa "Pegar texto" como alternativa.', true);
     }
+  }
+  $('#fileFotoCamera').addEventListener('change', e => {
+    const file = e.target.files[0];
+    e.target.value = '';
+    if (file) handleFotoFile(file);
+  });
+  $('#fileFotoGaleria').addEventListener('change', e => {
+    const file = e.target.files[0];
+    e.target.value = '';
+    if (file) handleFotoFile(file);
   });
 
   $('#btnParseText').addEventListener('click', () => {
@@ -789,6 +800,72 @@
     renderAll();
   });
   $('#receptionSearch').addEventListener('input', renderReceptionList);
+
+  // ---------------- Invitación del evento ----------------
+  function renderInvitationBox() {
+    const img = DB.event.invitacion;
+    $('#invitationBox').classList.toggle('hidden', !img);
+    $('#invitationOcrText').classList.add('hidden');
+    $('#invitationOcrStatus').classList.add('hidden');
+    if (img) $('#invitationThumb').src = img;
+  }
+
+  $('#btnUploadInvitation').addEventListener('click', () => $('#fileInvitation').click());
+  $('#fileInvitation').addEventListener('change', async e => {
+    const file = e.target.files[0];
+    e.target.value = '';
+    if (!file) return;
+    try {
+      const resized = await Importers._downscaleImage(file, 1400);
+      const dataUrl = await new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(reader.result);
+        reader.onerror = reject;
+        reader.readAsDataURL(resized);
+      });
+      DB.setInvitacion(dataUrl);
+      renderInvitationBox();
+      toast('Invitación guardada');
+    } catch (err) {
+      console.error(err);
+      if (err && err.name === 'QuotaExceededError') {
+        alert('No se pudo guardar la imagen: no hay suficiente espacio de almacenamiento en el navegador. Prueba con una foto más liviana, o borra respaldos/eventos que ya no uses.');
+      } else {
+        alert('No se pudo guardar la imagen de la invitación.');
+      }
+    }
+  });
+  $('#btnRemoveInvitation').addEventListener('click', () => {
+    if (confirm('¿Quitar la imagen de la invitación?')) {
+      DB.clearInvitacion();
+      renderInvitationBox();
+    }
+  });
+  $('#btnOcrInvitation').addEventListener('click', async () => {
+    const dataUrl = DB.event.invitacion;
+    if (!dataUrl) return;
+    const statusEl = $('#invitationOcrStatus');
+    statusEl.classList.remove('hidden');
+    statusEl.classList.remove('error');
+    statusEl.textContent = 'Leyendo texto de la invitación…';
+    $('#invitationOcrText').classList.add('hidden');
+    try {
+      const blob = await (await fetch(dataUrl)).blob();
+      const { rawText } = await Importers.parseImage(blob, m => {
+        if (m.status === 'recognizing text') {
+          statusEl.textContent = `Leyendo texto… ${Math.round((m.progress || 0) * 100)}%`;
+        }
+      });
+      statusEl.classList.add('hidden');
+      if (!rawText.trim()) { toast('No se detectó texto en la imagen'); return; }
+      $('#invitationOcrText').value = rawText;
+      $('#invitationOcrText').classList.remove('hidden');
+    } catch (err) {
+      console.error(err);
+      statusEl.textContent = 'No se pudo leer el texto de la imagen.';
+      statusEl.classList.add('error');
+    }
+  });
 
   // ---------------- Render global ----------------
   function renderAll() {
