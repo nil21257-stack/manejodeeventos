@@ -1,5 +1,10 @@
 // db.js — Toda la persistencia vive en localStorage. Sin backend, sin red.
-const DB_KEY = 'eventos_pwa_v1';
+// Soporta VARIOS eventos guardados en el mismo dispositivo (ej. una boda, luego un cumpleaños),
+// cada uno con su propia lista de invitados y mesas, independientes entre sí.
+
+const REGISTRY_KEY = 'eventos_pwa_registry_v1';
+const ACTIVE_KEY = 'eventos_pwa_active_v1';
+const LEGACY_KEY = 'eventos_pwa_v1'; // versión anterior de un solo evento
 
 function normalizeName(s) {
   return (s || '')
@@ -9,19 +14,125 @@ function normalizeName(s) {
     .trim();
 }
 
+function newId(prefix) {
+  return prefix + '_' + Date.now() + '_' + Math.random().toString(36).slice(2, 7);
+}
+
+function dataKey(eventId) { return 'eventos_pwa_data_' + eventId; }
+
 const DB = {
   _data: null,
+  _activeId: null,
 
+  // ---------- Registro de eventos ----------
+  _loadRegistry() {
+    try {
+      const raw = localStorage.getItem(REGISTRY_KEY);
+      return raw ? JSON.parse(raw) : [];
+    } catch (e) { return []; }
+  },
+
+  _saveRegistry(reg) {
+    localStorage.setItem(REGISTRY_KEY, JSON.stringify(reg));
+  },
+
+  listEvents() {
+    return this._loadRegistry().sort((a, b) => (b.updatedAt || 0) - (a.updatedAt || 0));
+  },
+
+  get activeEventId() {
+    if (this._activeId) return this._activeId;
+    this._activeId = localStorage.getItem(ACTIVE_KEY);
+    return this._activeId;
+  },
+
+  _migrateLegacyIfNeeded() {
+    const reg = this._loadRegistry();
+    if (reg.length > 0) return; // ya hay eventos registrados, nada que migrar
+    const legacyRaw = localStorage.getItem(LEGACY_KEY);
+    let legacyData = null;
+    if (legacyRaw) {
+      try { legacyData = JSON.parse(legacyRaw); } catch (e) { legacyData = null; }
+    }
+    const id = newId('ev');
+    const data = legacyData || this._defaults();
+    if (!data.event) data.event = { name: 'Mi evento', date: '' };
+    localStorage.setItem(dataKey(id), JSON.stringify(data));
+    const entry = { id, name: data.event.name || 'Mi evento', date: data.event.date || '', updatedAt: Date.now() };
+    this._saveRegistry([entry]);
+    localStorage.setItem(ACTIVE_KEY, id);
+    if (legacyRaw) localStorage.removeItem(LEGACY_KEY);
+  },
+
+  createEvent(name) {
+    const id = newId('ev');
+    const data = this._defaults();
+    data.event = { name: name || 'Nuevo evento', date: '' };
+    localStorage.setItem(dataKey(id), JSON.stringify(data));
+    const reg = this._loadRegistry();
+    reg.push({ id, name: data.event.name, date: '', updatedAt: Date.now() });
+    this._saveRegistry(reg);
+    this.switchEvent(id);
+    return id;
+  },
+
+  duplicateEvent(id, newName) {
+    const raw = localStorage.getItem(dataKey(id));
+    if (!raw) return null;
+    const data = JSON.parse(raw);
+    data.event = { name: newName || (data.event.name + ' (copia)'), date: data.event.date || '' };
+    const newIdVal = newId('ev');
+    localStorage.setItem(dataKey(newIdVal), JSON.stringify(data));
+    const reg = this._loadRegistry();
+    reg.push({ id: newIdVal, name: data.event.name, date: data.event.date || '', updatedAt: Date.now() });
+    this._saveRegistry(reg);
+    return newIdVal;
+  },
+
+  switchEvent(id) {
+    if (!localStorage.getItem(dataKey(id))) return false;
+    localStorage.setItem(ACTIVE_KEY, id);
+    this._activeId = id;
+    this._data = null; // fuerza recarga
+    return true;
+  },
+
+  deleteEvent(id) {
+    const reg = this._loadRegistry().filter(e => e.id !== id);
+    localStorage.removeItem(dataKey(id));
+    this._saveRegistry(reg);
+    if (this.activeEventId === id) {
+      if (reg.length) this.switchEvent(reg[0].id);
+      else this.createEvent('Mi evento');
+    }
+  },
+
+  _touchRegistryEntry() {
+    const reg = this._loadRegistry();
+    const entry = reg.find(e => e.id === this.activeEventId);
+    if (entry) {
+      entry.name = this.event.name || 'Mi evento';
+      entry.date = this.event.date || '';
+      entry.updatedAt = Date.now();
+      this._saveRegistry(reg);
+    }
+  },
+
+  // ---------- Datos del evento activo ----------
   load() {
+    this._migrateLegacyIfNeeded();
+    if (!this.activeEventId) {
+      // No debería pasar tras la migración, pero por si acaso:
+      this.createEvent('Mi evento');
+    }
     if (this._data) return this._data;
     try {
-      const raw = localStorage.getItem(DB_KEY);
+      const raw = localStorage.getItem(dataKey(this.activeEventId));
       this._data = raw ? JSON.parse(raw) : this._defaults();
     } catch (e) {
       console.error('Error leyendo datos locales, iniciando de cero.', e);
       this._data = this._defaults();
     }
-    // Migración/relleno de campos faltantes
     if (!this._data.event) this._data.event = { name: 'Mi evento', date: '' };
     if (!Array.isArray(this._data.guests)) this._data.guests = [];
     if (!Array.isArray(this._data.tables)) this._data.tables = [];
@@ -38,7 +149,8 @@ const DB = {
   },
 
   save() {
-    localStorage.setItem(DB_KEY, JSON.stringify(this._data));
+    localStorage.setItem(dataKey(this.activeEventId), JSON.stringify(this._data));
+    this._touchRegistryEntry();
   },
 
   get event() { return this.load().event; },
@@ -59,7 +171,7 @@ const DB = {
 
   addGuest(nombre, mesa, llego) {
     const g = {
-      id: 'g_' + Date.now() + '_' + Math.random().toString(36).slice(2, 7),
+      id: newId('g'),
       nombre: nombre.trim(),
       mesa: (mesa || '').trim(),
       llego: !!llego
@@ -94,6 +206,12 @@ const DB = {
     this.save();
   },
 
+  deleteGuests(ids) {
+    const set = new Set(ids);
+    this._data.guests = this.load().guests.filter(g => !set.has(g.id));
+    this.save();
+  },
+
   moveGuest(id, mesa) {
     this.updateGuest(id, this.guests.find(x => x.id === id).nombre, mesa);
   },
@@ -102,10 +220,7 @@ const DB = {
     const n = (name || '').trim();
     if (!n) return;
     if (!this.load().tables.find(t => t.name.toLowerCase() === n.toLowerCase())) {
-      this._data.tables.push({
-        id: 't_' + Date.now() + '_' + Math.random().toString(36).slice(2, 7),
-        name: n, capacidad: null, etiqueta: ''
-      });
+      this._data.tables.push({ id: newId('t'), name: n, capacidad: null, etiqueta: '' });
     }
   },
 
@@ -115,8 +230,7 @@ const DB = {
     const existing = this.tables.find(t => t.name.toLowerCase() === n.toLowerCase());
     if (existing) return existing;
     const t = {
-      id: 't_' + Date.now() + '_' + Math.random().toString(36).slice(2, 7),
-      name: n,
+      id: newId('t'), name: n,
       capacidad: (capacidad || capacidad === 0) ? Number(capacidad) : null,
       etiqueta: (etiqueta || '').trim()
     };
@@ -132,7 +246,6 @@ const DB = {
     t.name = name.trim();
     t.capacidad = (capacidad || capacidad === 0) ? Number(capacidad) : null;
     t.etiqueta = (etiqueta || '').trim();
-    // Si cambió el nombre, actualiza a los invitados que apuntaban al nombre viejo
     if (oldName.toLowerCase() !== t.name.toLowerCase()) {
       this.guests.forEach(g => {
         if (g.mesa.toLowerCase() === oldName.toLowerCase()) g.mesa = t.name;
@@ -144,7 +257,6 @@ const DB = {
   deleteTable(id) {
     const t = this.tables.find(x => x.id === id);
     if (!t) return;
-    // Los invitados de esa mesa quedan sin mesa asignada
     this.guests.forEach(g => { if (g.mesa.toLowerCase() === t.name.toLowerCase()) g.mesa = ''; });
     const i = this.load().tables.findIndex(x => x.id === id);
     if (i > -1) this._data.tables.splice(i, 1);
@@ -155,7 +267,6 @@ const DB = {
     return this.guests.filter(g => g.mesa.toLowerCase() === tableName.toLowerCase());
   },
 
-  // Importa un lote de {nombre, mesa}. Si replace=true, sustituye toda la lista.
   bulkImport(rows, replace) {
     if (replace) {
       this._data.guests = [];

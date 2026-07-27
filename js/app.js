@@ -32,10 +32,30 @@
   }
 
   let currentFilter = 'todos';
+  let selectionMode = false;
+  let selectedIds = new Set();
 
   function buildGuestRow(g, onCheckinToggle) {
     const li = document.createElement('li');
-    li.className = 'guest-row';
+    li.className = 'guest-row' + (selectionMode ? ' selectable' : '');
+
+    if (selectionMode) {
+      const checked = selectedIds.has(g.id);
+      li.innerHTML = `
+        <div class="guest-checkbox ${checked ? 'checked' : ''}">✓</div>
+        <div class="guest-info">
+          <div class="guest-name"></div>
+          <div class="guest-table ${g.mesa ? '' : 'unassigned'}"></div>
+        </div>`;
+      li.querySelector('.guest-name').textContent = g.nombre;
+      li.querySelector('.guest-table').textContent = g.mesa || 'Sin mesa asignada';
+      li.addEventListener('click', () => {
+        if (selectedIds.has(g.id)) selectedIds.delete(g.id); else selectedIds.add(g.id);
+        renderGuests();
+      });
+      return li;
+    }
+
     li.innerHTML = `
       <div class="guest-avatar ${g.llego ? 'checked' : ''}" title="Marcar llegada">${g.llego ? '✓' : (initials(g.nombre) || '?')}</div>
       <div class="guest-info">
@@ -77,15 +97,51 @@
     $('#statMesas').textContent = mesas;
     $('#statSinMesa').textContent = sinMesa;
     $('#statLlegaron').textContent = llegaron;
+
+    if (selectionMode) {
+      // Limpia selecciones de invitados que ya no están visibles/existen
+      const visibleIds = new Set(guests.map(g => g.id));
+      selectedIds.forEach(id => { if (!visibleIds.has(id) && !DB.guests.find(g => g.id === id)) selectedIds.delete(id); });
+      $('#selectionCount').textContent = `${selectedIds.size} seleccionado${selectedIds.size === 1 ? '' : 's'}`;
+    }
   }
   $('#searchInput').addEventListener('input', renderGuests);
-  $$('.filter-chip').forEach(chip => {
+  $$('.filter-chip[data-filter]').forEach(chip => {
     chip.addEventListener('click', () => {
       currentFilter = chip.dataset.filter;
-      $$('.filter-chip').forEach(c => c.classList.remove('active'));
+      $$('.filter-chip[data-filter]').forEach(c => c.classList.remove('active'));
       chip.classList.add('active');
       renderGuests();
     });
+  });
+
+  $('#btnToggleSelect').addEventListener('click', () => {
+    selectionMode = !selectionMode;
+    selectedIds.clear();
+    $('#btnToggleSelect').classList.toggle('active', selectionMode);
+    $('#btnToggleSelect').textContent = selectionMode ? 'Cancelar' : 'Seleccionar';
+    $('#selectionBar').classList.toggle('hidden', !selectionMode);
+    $('#btnAddGuest').classList.toggle('hidden', selectionMode);
+    renderGuests();
+  });
+  $('#btnSelectAll').addEventListener('click', () => {
+    const q = $('#searchInput').value.trim().toLowerCase();
+    let guests = DB.guests.filter(g => !q || g.nombre.toLowerCase().includes(q) || g.mesa.toLowerCase().includes(q));
+    if (currentFilter === 'llegaron') guests = guests.filter(g => g.llego);
+    else if (currentFilter === 'faltan') guests = guests.filter(g => !g.llego);
+    const allSelected = guests.every(g => selectedIds.has(g.id)) && guests.length > 0;
+    if (allSelected) guests.forEach(g => selectedIds.delete(g.id));
+    else guests.forEach(g => selectedIds.add(g.id));
+    renderGuests();
+  });
+  $('#btnDeleteSelected').addEventListener('click', () => {
+    if (!selectedIds.size) { toast('No hay invitados seleccionados'); return; }
+    if (confirm(`¿Eliminar ${selectedIds.size} invitado(s) seleccionado(s)? Esta acción no se puede deshacer.`)) {
+      DB.deleteGuests(Array.from(selectedIds));
+      selectedIds.clear();
+      renderAll();
+      toast('Invitados eliminados');
+    }
   });
 
   // ---------------- Modal invitado ----------------
@@ -293,9 +349,49 @@
   });
 
   // ---------------- Ajustes ----------------
+  function renderEventsList() {
+    const wrap = $('#eventsList');
+    wrap.innerHTML = '';
+    const events = DB.listEvents();
+    events.forEach(ev => {
+      const isActive = ev.id === DB.activeEventId;
+      const item = document.createElement('div');
+      item.className = 'event-item' + (isActive ? ' active' : '');
+      item.innerHTML = `
+        <div class="event-info">
+          <div class="event-name"></div>
+          <div class="event-meta"></div>
+        </div>
+        ${isActive ? '<span class="event-badge">Activo</span>' : '<button class="ev-switch" title="Usar este evento">⇄</button>'}
+        <button class="ev-delete" title="Eliminar evento">🗑</button>`;
+      item.querySelector('.event-name').textContent = ev.name || 'Sin nombre';
+      item.querySelector('.event-meta').textContent = ev.date
+        ? new Date(ev.date + 'T00:00').toLocaleDateString('es-DO', { day: 'numeric', month: 'short', year: 'numeric' })
+        : 'Sin fecha';
+      const switchBtn = item.querySelector('.ev-switch');
+      if (switchBtn) switchBtn.addEventListener('click', () => {
+        DB.switchEvent(ev.id);
+        $('#modalSettings').classList.add('hidden');
+        renderAll();
+        toast(`Ahora estás en "${ev.name}"`);
+      });
+      item.querySelector('.ev-delete').addEventListener('click', () => {
+        if (events.length === 1) { toast('No puedes borrar tu único evento'); return; }
+        if (confirm(`¿Eliminar el evento "${ev.name}" y todos sus invitados/mesas? No se puede deshacer.`)) {
+          DB.deleteEvent(ev.id);
+          renderEventsList();
+          renderAll();
+          toast('Evento eliminado');
+        }
+      });
+      wrap.appendChild(item);
+    });
+  }
+
   $('#btnSettings').addEventListener('click', () => {
     $('#settingsEventName').value = DB.event.name || '';
     $('#settingsEventDate').value = DB.event.date || '';
+    renderEventsList();
     $('#modalSettings').classList.remove('hidden');
   });
   $('#btnCancelSettings').addEventListener('click', () => $('#modalSettings').classList.add('hidden'));
@@ -305,12 +401,27 @@
     renderHeader();
     toast('Ajustes guardados');
   });
+  $('#btnNewEvent').addEventListener('click', () => {
+    const name = prompt('Nombre del nuevo evento:', 'Nuevo evento');
+    if (name === null) return;
+    DB.createEvent(name.trim() || 'Nuevo evento');
+    $('#modalSettings').classList.add('hidden');
+    renderAll();
+    toast('Evento creado — ya estás en él');
+  });
+  $('#btnDuplicateEvent').addEventListener('click', () => {
+    const name = prompt('Nombre para la copia:', DB.event.name + ' (copia)');
+    if (name === null) return;
+    DB.duplicateEvent(DB.activeEventId, name.trim());
+    renderEventsList();
+    toast('Evento duplicado. Actívalo desde la lista si quieres cambiarte a él.');
+  });
   $('#btnClearAll').addEventListener('click', () => {
-    if (confirm('Esto borrará TODOS los invitados y mesas de este dispositivo. ¿Continuar?')) {
+    if (confirm('Esto borrará todos los invitados y mesas de ESTE evento (no de tus otros eventos guardados). ¿Continuar?')) {
       DB.clearAll();
       $('#modalSettings').classList.add('hidden');
       renderAll();
-      toast('Datos borrados');
+      toast('Datos de este evento borrados');
     }
   });
   $('#btnExportBackup').addEventListener('click', () => {
@@ -318,7 +429,7 @@
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = 'respaldo-evento.json';
+    a.download = `respaldo-${(DB.event.name || 'evento').toLowerCase().replace(/\s+/g, '-')}.json`;
     a.click();
     URL.revokeObjectURL(url);
   });

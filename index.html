@@ -46,7 +46,15 @@
         <button class="filter-chip active" data-filter="todos">Todos</button>
         <button class="filter-chip" data-filter="llegaron">Llegaron</button>
         <button class="filter-chip" data-filter="faltan">Faltan</button>
+        <button id="btnToggleSelect" class="filter-chip select-toggle">Seleccionar</button>
       </div>
+    </div>
+
+    <div id="selectionBar" class="selection-bar hidden">
+      <span id="selectionCount">0 seleccionados</span>
+      <div class="spacer"></div>
+      <button id="btnSelectAll" class="btn-ghost">Todos</button>
+      <button id="btnDeleteSelected" class="btn-danger">Eliminar</button>
     </div>
     <ul id="guestList" class="guest-list"></ul>
     <p id="emptyGuests" class="empty-state hidden">
@@ -208,7 +216,13 @@
       <button id="btnSaveSettings" class="btn-primary">Guardar</button>
     </div>
     <hr>
-    <button id="btnClearAll" class="btn-danger full">Borrar todos los datos</button>
+    <h4 class="section-label">Mis eventos</h4>
+    <p class="hint">Cada evento tiene su propia lista de invitados y mesas, totalmente separada.</p>
+    <div id="eventsList" class="events-list"></div>
+    <button id="btnNewEvent" class="btn-ghost full">+ Crear nuevo evento</button>
+    <button id="btnDuplicateEvent" class="btn-ghost full">Duplicar este evento (para reusar la lista)</button>
+    <hr>
+    <button id="btnClearAll" class="btn-danger full">Borrar datos de este evento</button>
   </div>
 </div>
 

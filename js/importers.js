@@ -63,7 +63,7 @@ const Importers = {
 
   async _ensurePdfJs() {
     if (window.pdfjsLib) return;
-    window.pdfjsLib = await import('./vendor/pdf.min.mjs');
+    window.pdfjsLib = await import('../vendor/pdf.min.mjs');
     pdfjsLib.GlobalWorkerOptions.workerSrc = 'vendor/pdf.worker.min.mjs';
   },
 
@@ -76,6 +76,7 @@ const Importers = {
       corePath: 'vendor/tesseract-core-simd-lstm.js',
       langPath: 'tessdata',
       gzip: true,
+      workerBlobURL: false,
       logger: m => { if (onProgress) onProgress(m); }
     });
     try {
