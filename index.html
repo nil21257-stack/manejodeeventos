@@ -1,0 +1,193 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Manejo de Eventos — Mesas e Invitados</title>
+<meta name="description" content="Organiza invitados y mesas para tu evento, 100% en tu dispositivo, sin internet.">
+<meta name="theme-color" content="#0F3D3E">
+<link rel="manifest" href="manifest.json">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<link rel="icon" href="icons/icon-192.png">
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+
+<header class="topbar">
+  <div class="brand">
+    <svg class="brand-mark" viewBox="0 0 100 100" aria-hidden="true">
+      <circle cx="50" cy="50" r="34" fill="none" stroke="currentColor" stroke-width="4"/>
+      <circle cx="50" cy="50" r="21" fill="currentColor" opacity=".18"/>
+      <circle cx="50" cy="19" r="5" fill="currentColor"/><circle cx="75" cy="34" r="5" fill="currentColor"/>
+      <circle cx="75" cy="66" r="5" fill="currentColor"/><circle cx="50" cy="81" r="5" fill="currentColor"/>
+      <circle cx="25" cy="66" r="5" fill="currentColor"/><circle cx="25" cy="34" r="5" fill="currentColor"/>
+    </svg>
+    <div>
+      <h1 id="eventTitle">Mi evento</h1>
+      <p id="eventSubtitle" class="subtitle">Sin fecha definida</p>
+    </div>
+  </div>
+  <button id="btnSettings" class="icon-btn" aria-label="Ajustes del evento" title="Ajustes">⚙</button>
+</header>
+
+<main id="views">
+
+  <!-- INVITADOS -->
+  <section id="view-invitados" class="view active">
+    <div class="view-head">
+      <div class="stat-row">
+        <div class="stat"><strong id="statTotal">0</strong><span>invitados</span></div>
+        <div class="stat"><strong id="statMesas">0</strong><span>mesas</span></div>
+        <div class="stat"><strong id="statSinMesa">0</strong><span>sin mesa</span></div>
+      </div>
+      <input id="searchInput" type="search" placeholder="Buscar invitado…" autocomplete="off">
+    </div>
+    <ul id="guestList" class="guest-list"></ul>
+    <p id="emptyGuests" class="empty-state hidden">
+      Aún no hay invitados.<br>Usa el botón <strong>Importar</strong> o agrega uno manualmente.
+    </p>
+    <button id="btnAddGuest" class="fab" aria-label="Agregar invitado">+</button>
+  </section>
+
+  <!-- MESAS -->
+  <section id="view-mesas" class="view">
+    <div class="view-head">
+      <h2 class="view-title">Plano de mesas</h2>
+      <button id="btnAddTable" class="btn-ghost">+ Mesa</button>
+    </div>
+    <div id="tablesFloor" class="tables-floor"></div>
+    <p id="emptyTables" class="empty-state hidden">
+      Todavía no hay mesas creadas.<br>Impórtalas desde tu lista o agrega una manualmente.
+    </p>
+  </section>
+
+  <!-- IMPORTAR -->
+  <section id="view-importar" class="view">
+    <div class="view-head"><h2 class="view-title">Importar lista de invitados</h2></div>
+
+    <div class="import-grid">
+      <button class="import-card" data-mode="excel">
+        <span class="import-icon">▤</span>
+        <span>Excel / CSV</span>
+        <small>.xlsx, .xls, .csv</small>
+      </button>
+      <button class="import-card" data-mode="pdf">
+        <span class="import-icon">▥</span>
+        <span>Documento PDF</span>
+        <small>texto seleccionable</small>
+      </button>
+      <button class="import-card" data-mode="foto">
+        <span class="import-icon">◎</span>
+        <span>Foto / Escaneo</span>
+        <small>reconoce el texto</small>
+      </button>
+      <button class="import-card" data-mode="texto">
+        <span class="import-icon">✎</span>
+        <span>Pegar texto</span>
+        <small>manual</small>
+      </button>
+    </div>
+
+    <input type="file" id="fileExcel" accept=".xlsx,.xls,.csv" class="hidden">
+    <input type="file" id="filePdf" accept="application/pdf" class="hidden">
+    <input type="file" id="fileFoto" accept="image/*" capture="environment" class="hidden">
+
+    <div id="importStatus" class="import-status hidden"></div>
+
+    <div id="importReview" class="import-review hidden">
+      <h3>Revisa el texto detectado</h3>
+      <p class="hint">Corrige lo que haga falta antes de convertirlo en invitados. Cada línea debe tener el nombre y, si la tienes, la mesa (ej: <em>Ana Pérez, Mesa 3</em>).</p>
+      <textarea id="rawTextArea" rows="10" spellcheck="false"></textarea>
+      <button id="btnParseText" class="btn-primary">Convertir a lista de invitados →</button>
+    </div>
+
+    <div id="importPreview" class="import-preview hidden">
+      <h3>Vista previa (<span id="previewCount">0</span> detectados)</h3>
+      <div id="previewList" class="preview-list"></div>
+      <div class="import-actions">
+        <label class="switch-row">
+          <input type="checkbox" id="replaceExisting">
+          <span>Reemplazar lista actual en vez de agregar</span>
+        </label>
+        <button id="btnConfirmImport" class="btn-primary">Importar invitados</button>
+      </div>
+    </div>
+  </section>
+
+</main>
+
+<nav class="tabbar">
+  <button class="tab-btn active" data-view="invitados"><span>☰</span>Invitados</button>
+  <button class="tab-btn" data-view="mesas"><span>◍</span>Mesas</button>
+  <button class="tab-btn" data-view="importar"><span>⇪</span>Importar</button>
+</nav>
+
+<!-- Modal: editar / crear invitado -->
+<div id="modalGuest" class="modal hidden">
+  <div class="modal-card">
+    <h3 id="modalGuestTitle">Nuevo invitado</h3>
+    <label>Nombre<input id="guestNameInput" type="text" placeholder="Nombre del invitado"></label>
+    <label>Mesa<input id="guestTableInput" type="text" placeholder="Ej: Mesa 3, Familia López…" list="tableSuggestions"></label>
+    <datalist id="tableSuggestions"></datalist>
+    <div class="modal-actions">
+      <button id="btnDeleteGuest" class="btn-danger hidden">Eliminar</button>
+      <div class="spacer"></div>
+      <button id="btnCancelGuest" class="btn-ghost">Cancelar</button>
+      <button id="btnSaveGuest" class="btn-primary">Guardar</button>
+    </div>
+  </div>
+</div>
+
+<!-- Modal: mover invitado de mesa -->
+<div id="modalMove" class="modal hidden">
+  <div class="modal-card">
+    <h3>Mover a otra mesa</h3>
+    <p id="moveGuestName" class="hint"></p>
+    <div id="moveTableOptions" class="move-options"></div>
+    <label>O escribe una mesa nueva<input id="moveNewTable" type="text" placeholder="Nueva mesa…"></label>
+    <div class="modal-actions">
+      <div class="spacer"></div>
+      <button id="btnCancelMove" class="btn-ghost">Cancelar</button>
+      <button id="btnConfirmMove" class="btn-primary">Mover</button>
+    </div>
+  </div>
+</div>
+
+<!-- Modal: nueva mesa -->
+<div id="modalTable" class="modal hidden">
+  <div class="modal-card">
+    <h3>Nueva mesa</h3>
+    <label>Nombre o número<input id="newTableName" type="text" placeholder="Ej: Mesa 5"></label>
+    <div class="modal-actions">
+      <div class="spacer"></div>
+      <button id="btnCancelTable" class="btn-ghost">Cancelar</button>
+      <button id="btnSaveTable" class="btn-primary">Crear</button>
+    </div>
+  </div>
+</div>
+
+<!-- Modal: ajustes -->
+<div id="modalSettings" class="modal hidden">
+  <div class="modal-card">
+    <h3>Ajustes del evento</h3>
+    <label>Nombre del evento<input id="settingsEventName" type="text" placeholder="Ej: Boda de Ana y Luis"></label>
+    <label>Fecha<input id="settingsEventDate" type="date"></label>
+    <div class="modal-actions">
+      <button id="btnExportBackup" class="btn-ghost">Exportar respaldo</button>
+      <div class="spacer"></div>
+      <button id="btnCancelSettings" class="btn-ghost">Cerrar</button>
+      <button id="btnSaveSettings" class="btn-primary">Guardar</button>
+    </div>
+    <hr>
+    <button id="btnClearAll" class="btn-danger full">Borrar todos los datos</button>
+  </div>
+</div>
+
+<div id="toast" class="toast hidden"></div>
+
+<script src="vendor/xlsx.full.min.js"></script>
+<script src="js/db.js"></script>
+<script src="js/importers.js"></script>
+<script src="js/app.js"></script>
+</body>
+</html>
