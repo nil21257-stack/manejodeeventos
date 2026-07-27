@@ -31,29 +31,40 @@
     return name.split(/\s+/).filter(Boolean).slice(0, 2).map(w => w[0].toUpperCase()).join('');
   }
 
+  let currentFilter = 'todos';
+
+  function buildGuestRow(g, onCheckinToggle) {
+    const li = document.createElement('li');
+    li.className = 'guest-row';
+    li.innerHTML = `
+      <div class="guest-avatar ${g.llego ? 'checked' : ''}" title="Marcar llegada">${g.llego ? '✓' : (initials(g.nombre) || '?')}</div>
+      <div class="guest-info">
+        <div class="guest-name"></div>
+        <div class="guest-table ${g.mesa ? '' : 'unassigned'}"></div>
+      </div>
+      <span class="chevron">›</span>`;
+    li.querySelector('.guest-name').textContent = g.nombre;
+    li.querySelector('.guest-table').textContent = g.mesa || 'Sin mesa asignada';
+    li.querySelector('.guest-avatar').addEventListener('click', ev => {
+      ev.stopPropagation();
+      DB.toggleCheckin(g.id);
+      if (onCheckinToggle) onCheckinToggle(); else renderAll();
+    });
+    li.addEventListener('click', () => openGuestModal(g.id));
+    return li;
+  }
+
   function renderGuests() {
     const q = $('#searchInput').value.trim().toLowerCase();
-    const guests = DB.guests
-      .filter(g => !q || g.nombre.toLowerCase().includes(q) || g.mesa.toLowerCase().includes(q))
-      .sort((a, b) => a.nombre.localeCompare(b.nombre, 'es'));
+    let guests = DB.guests
+      .filter(g => !q || g.nombre.toLowerCase().includes(q) || g.mesa.toLowerCase().includes(q));
+    if (currentFilter === 'llegaron') guests = guests.filter(g => g.llego);
+    else if (currentFilter === 'faltan') guests = guests.filter(g => !g.llego);
+    guests = guests.sort((a, b) => a.nombre.localeCompare(b.nombre, 'es'));
 
     const list = $('#guestList');
     list.innerHTML = '';
-    guests.forEach(g => {
-      const li = document.createElement('li');
-      li.className = 'guest-row';
-      li.innerHTML = `
-        <div class="guest-avatar">${initials(g.nombre) || '?'}</div>
-        <div class="guest-info">
-          <div class="guest-name"></div>
-          <div class="guest-table ${g.mesa ? '' : 'unassigned'}"></div>
-        </div>
-        <span class="chevron">›</span>`;
-      li.querySelector('.guest-name').textContent = g.nombre;
-      li.querySelector('.guest-table').textContent = g.mesa || 'Sin mesa asignada';
-      li.addEventListener('click', () => openGuestModal(g.id));
-      list.appendChild(li);
-    });
+    guests.forEach(g => list.appendChild(buildGuestRow(g)));
 
     $('#emptyGuests').classList.toggle('hidden', DB.guests.length > 0);
     list.classList.toggle('hidden', DB.guests.length === 0);
@@ -61,11 +72,21 @@
     const total = DB.guests.length;
     const mesas = new Set(DB.guests.filter(g => g.mesa).map(g => g.mesa.toLowerCase())).size;
     const sinMesa = DB.guests.filter(g => !g.mesa).length;
+    const llegaron = DB.guests.filter(g => g.llego).length;
     $('#statTotal').textContent = total;
     $('#statMesas').textContent = mesas;
     $('#statSinMesa').textContent = sinMesa;
+    $('#statLlegaron').textContent = llegaron;
   }
   $('#searchInput').addEventListener('input', renderGuests);
+  $$('.filter-chip').forEach(chip => {
+    chip.addEventListener('click', () => {
+      currentFilter = chip.dataset.filter;
+      $$('.filter-chip').forEach(c => c.classList.remove('active'));
+      chip.classList.add('active');
+      renderGuests();
+    });
+  });
 
   // ---------------- Modal invitado ----------------
   function openGuestModal(id) {
@@ -105,6 +126,10 @@
     const nombre = $('#guestNameInput').value.trim();
     const mesa = $('#guestTableInput').value.trim();
     if (!nombre) { toast('Escribe el nombre del invitado'); return; }
+    const dups = DB.findDuplicates(nombre, editingGuestId);
+    if (dups.length && !confirm(`Ya existe "${dups[0].nombre}"${dups[0].mesa ? ' en ' + dups[0].mesa : ''}. ¿Agregar de todas formas?`)) {
+      return;
+    }
     if (editingGuestId) DB.updateGuest(editingGuestId, nombre, mesa);
     else DB.addGuest(nombre, mesa);
     closeGuestModal();
@@ -122,64 +147,118 @@
   });
 
   // ---------------- Mesas ----------------
+  let editingTableId = null;
+  let detailTableId = null;
+
+  function tableSummaryText(t, guests) {
+    if (t.etiqueta) return t.etiqueta;
+    if (!guests.length) return 'Sin invitados aún';
+    const names = guests.slice(0, 2).map(g => g.nombre).join(' y ');
+    return guests.length > 2 ? `${names} +${guests.length - 2} más` : names;
+  }
+
   function renderTables() {
     const floor = $('#tablesFloor');
     floor.innerHTML = '';
     const tables = DB.tables.slice().sort((a, b) => a.name.localeCompare(b.name, 'es', { numeric: true }));
 
     tables.forEach(t => {
-      const guests = DB.guests.filter(g => g.mesa.toLowerCase() === t.name.toLowerCase());
+      const guests = DB.guestsInTable(t.name);
+      const over = t.capacidad != null && guests.length > t.capacidad;
       const card = document.createElement('div');
-      card.className = 'table-card' + (guests.length === 0 ? ' empty' : '');
+      card.className = 'table-card' + (guests.length === 0 ? ' empty' : '') + (over ? ' overbooked' : '');
+      const occText = t.capacidad != null
+        ? `${guests.length}/${t.capacidad} asientos`
+        : `${guests.length} invitado${guests.length === 1 ? '' : 's'}`;
       card.innerHTML = `
         <div class="table-name"></div>
-        <div class="table-count">${guests.length} invitado${guests.length === 1 ? '' : 's'}</div>
-        <div class="table-chips"></div>`;
+        <div class="table-summary"></div>
+        <div class="table-occupancy ${over ? 'full' : ''}"></div>`;
       card.querySelector('.table-name').textContent = t.name;
-      const chipsWrap = card.querySelector('.table-chips');
-      guests.slice(0, 8).forEach(g => {
-        const chip = document.createElement('span');
-        chip.className = 'chip';
-        chip.textContent = g.nombre;
-        chip.addEventListener('click', ev => { ev.stopPropagation(); openMoveModal(g.id); });
-        chipsWrap.appendChild(chip);
-      });
-      if (guests.length > 8) {
-        const more = document.createElement('span');
-        more.className = 'chip';
-        more.textContent = `+${guests.length - 8} más`;
-        chipsWrap.appendChild(more);
-      }
-      card.addEventListener('click', () => {
-        if (confirm(`¿Eliminar la mesa "${t.name}"? Sus invitados quedarán sin mesa asignada.`)) {
-          DB.deleteTable(t.id);
-          renderAll();
-        }
-      });
+      card.querySelector('.table-summary').textContent = tableSummaryText(t, guests);
+      card.querySelector('.table-occupancy').textContent = occText;
+      card.addEventListener('click', () => openTableDetail(t.id));
       floor.appendChild(card);
     });
 
     $('#emptyTables').classList.toggle('hidden', tables.length > 0);
   }
 
-  $('#btnAddTable').addEventListener('click', () => {
-    $('#newTableName').value = '';
+  function openTableDetail(tableId) {
+    detailTableId = tableId;
+    const t = DB.tables.find(x => x.id === tableId);
+    if (!t) return;
+    const guests = DB.guestsInTable(t.name).sort((a, b) => a.nombre.localeCompare(b.nombre, 'es'));
+    $('#detailTableName').textContent = t.name;
+    const occText = t.capacidad != null
+      ? `${guests.length}/${t.capacidad} asientos ocupados`
+      : `${guests.length} invitado${guests.length === 1 ? '' : 's'}`;
+    $('#detailTableOccupancy').textContent = occText;
+
+    const list = $('#detailGuestList');
+    list.innerHTML = '';
+    guests.forEach(g => {
+      const li = buildGuestRow(g, () => openTableDetail(tableId));
+      const moveBtn = document.createElement('button');
+      moveBtn.className = 'move-btn';
+      moveBtn.textContent = 'Mover';
+      moveBtn.addEventListener('click', ev => { ev.stopPropagation(); openMoveModal(g.id, () => openTableDetail(tableId)); });
+      li.insertBefore(moveBtn, li.querySelector('.chevron'));
+      li.querySelector('.chevron').remove();
+      list.appendChild(li);
+    });
+    $('#detailEmpty').classList.toggle('hidden', guests.length > 0);
+    list.classList.toggle('hidden', guests.length === 0);
+
+    $('#modalTableDetail').classList.remove('hidden');
+  }
+  $('#btnCloseTableDetail').addEventListener('click', () => $('#modalTableDetail').classList.add('hidden'));
+  $('#btnEditTable').addEventListener('click', () => {
+    $('#modalTableDetail').classList.add('hidden');
+    openTableModal(detailTableId);
+  });
+
+  function openTableModal(tableId) {
+    editingTableId = tableId || null;
+    const t = tableId ? DB.tables.find(x => x.id === tableId) : null;
+    $('#modalTableTitle').textContent = t ? 'Editar mesa' : 'Nueva mesa';
+    $('#newTableName').value = t ? t.name : '';
+    $('#newTableCapacity').value = (t && t.capacidad != null) ? t.capacidad : '';
+    $('#newTableLabel').value = t ? t.etiqueta : '';
+    $('#btnDeleteTable').classList.toggle('hidden', !t);
     $('#modalTable').classList.remove('hidden');
     setTimeout(() => $('#newTableName').focus(), 50);
-  });
+  }
+
+  $('#btnAddTable').addEventListener('click', () => openTableModal(null));
   $('#btnCancelTable').addEventListener('click', () => $('#modalTable').classList.add('hidden'));
   $('#btnSaveTable').addEventListener('click', () => {
     const name = $('#newTableName').value.trim();
+    const capacidad = $('#newTableCapacity').value.trim();
+    const etiqueta = $('#newTableLabel').value.trim();
     if (!name) { toast('Escribe un nombre para la mesa'); return; }
-    DB.addTable(name);
+    if (editingTableId) DB.updateTable(editingTableId, name, capacidad, etiqueta);
+    else DB.addTable(name, capacidad, etiqueta);
     $('#modalTable').classList.add('hidden');
     renderAll();
-    toast('Mesa creada');
+    toast('Mesa guardada');
+  });
+  $('#btnDeleteTable').addEventListener('click', () => {
+    if (!editingTableId) return;
+    const t = DB.tables.find(x => x.id === editingTableId);
+    if (confirm(`¿Eliminar la mesa "${t.name}"? Sus invitados quedarán sin mesa asignada.`)) {
+      DB.deleteTable(editingTableId);
+      $('#modalTable').classList.add('hidden');
+      renderAll();
+      toast('Mesa eliminada');
+    }
   });
 
   // ---------------- Mover invitado ----------------
-  function openMoveModal(guestId) {
+  let moveDoneCallback = null;
+  function openMoveModal(guestId, onDone) {
     movingGuestId = guestId;
+    moveDoneCallback = onDone || null;
     const g = DB.guests.find(x => x.id === guestId);
     $('#moveGuestName').textContent = `${g.nombre} — mesa actual: ${g.mesa || 'sin asignar'}`;
     const wrap = $('#moveTableOptions');
@@ -208,7 +287,8 @@
     if (!mesa) { toast('Elige o escribe una mesa'); return; }
     DB.moveGuest(movingGuestId, mesa);
     $('#modalMove').classList.add('hidden');
-    renderAll();
+    if (moveDoneCallback) { renderAll(); moveDoneCallback(); }
+    else renderAll();
     toast('Invitado movido');
   });
 
@@ -312,7 +392,7 @@
     const file = e.target.files[0];
     e.target.value = '';
     if (!file) return;
-    setStatus('Reconociendo texto en la imagen… esto puede tardar unos segundos.');
+    setStatus('Preparando imagen…');
     try {
       const { rawText } = await Importers.parseImage(file, m => {
         if (m.status === 'recognizing text') {
@@ -340,26 +420,56 @@
     pendingImportRows = rows;
     $('#importReview').classList.add('hidden');
     $('#importPreview').classList.remove('hidden');
-    $('#previewCount').textContent = rows.length;
+    renderPreviewList(rows);
+  }
+
+  function renderPreviewList(rows) {
+    const seen = new Map(); // normalizedName -> primer índice visto
+    let dupCount = 0;
+    rows.forEach((r, i) => {
+      if (r._removed) return;
+      const key = normalizeName(r.nombre);
+      if (!key) return;
+      const existingInDb = DB.findDuplicates(r.nombre).length > 0;
+      const repeatedInBatch = seen.has(key);
+      r._dup = existingInDb || repeatedInBatch;
+      if (r._dup) dupCount++;
+      if (!repeatedInBatch) seen.set(key, i);
+    });
+
+    $('#previewCount').textContent = rows.filter(r => !r._removed).length;
+    $('#previewDupInfo').textContent = dupCount ? `, ${dupCount} posible${dupCount === 1 ? '' : 's'} duplicado${dupCount === 1 ? '' : 's'}` : '';
+    $('#btnRemoveDuplicates').classList.toggle('hidden', dupCount === 0);
+
     const list = $('#previewList');
     list.innerHTML = '';
     rows.forEach((r, i) => {
+      if (r._removed) return;
       const row = document.createElement('div');
-      row.className = 'preview-row';
+      row.className = 'preview-row' + (r._dup ? ' duplicate' : '');
       row.innerHTML = `
         <input class="pname" type="text" value="${escapeAttr(r.nombre)}">
         <input class="ptable" type="text" value="${escapeAttr(r.mesa || '')}" placeholder="mesa">
+        ${r._dup ? '<span class="dup-tag">duplicado</span>' : ''}
         <button class="prm" aria-label="Quitar">✕</button>`;
-      row.querySelector('.pname').addEventListener('input', e => rows[i].nombre = e.target.value);
+      row.querySelector('.pname').addEventListener('input', e => { rows[i].nombre = e.target.value; });
       row.querySelector('.ptable').addEventListener('input', e => rows[i].mesa = e.target.value);
       row.querySelector('.prm').addEventListener('click', () => {
         rows[i]._removed = true;
-        row.remove();
-        $('#previewCount').textContent = rows.filter(r => !r._removed).length;
+        renderPreviewList(rows);
       });
       list.appendChild(row);
     });
   }
+
+  $('#btnRemoveDuplicates').addEventListener('click', () => {
+    let removed = 0;
+    pendingImportRows.forEach(r => {
+      if (r._dup && !r._removed) { r._removed = true; removed++; }
+    });
+    renderPreviewList(pendingImportRows);
+    toast(`${removed} duplicado${removed === 1 ? '' : 's'} quitado${removed === 1 ? '' : 's'}`);
+  });
 
   function escapeAttr(s) {
     return String(s).replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;');

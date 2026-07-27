@@ -39,8 +39,14 @@
         <div class="stat"><strong id="statTotal">0</strong><span>invitados</span></div>
         <div class="stat"><strong id="statMesas">0</strong><span>mesas</span></div>
         <div class="stat"><strong id="statSinMesa">0</strong><span>sin mesa</span></div>
+        <div class="stat"><strong id="statLlegaron">0</strong><span>llegaron</span></div>
       </div>
       <input id="searchInput" type="search" placeholder="Buscar invitado…" autocomplete="off">
+      <div class="filter-chips">
+        <button class="filter-chip active" data-filter="todos">Todos</button>
+        <button class="filter-chip" data-filter="llegaron">Llegaron</button>
+        <button class="filter-chip" data-filter="faltan">Faltan</button>
+      </div>
     </div>
     <ul id="guestList" class="guest-list"></ul>
     <p id="emptyGuests" class="empty-state hidden">
@@ -102,9 +108,10 @@
     </div>
 
     <div id="importPreview" class="import-preview hidden">
-      <h3>Vista previa (<span id="previewCount">0</span> detectados)</h3>
+      <h3>Vista previa (<span id="previewCount">0</span> detectados<span id="previewDupInfo"></span>)</h3>
       <div id="previewList" class="preview-list"></div>
       <div class="import-actions">
+        <button id="btnRemoveDuplicates" class="btn-ghost hidden">Quitar duplicados automáticamente</button>
         <label class="switch-row">
           <input type="checkbox" id="replaceExisting">
           <span>Reemplazar lista actual en vez de agregar</span>
@@ -156,12 +163,34 @@
 <!-- Modal: nueva mesa -->
 <div id="modalTable" class="modal hidden">
   <div class="modal-card">
-    <h3>Nueva mesa</h3>
+    <h3 id="modalTableTitle">Nueva mesa</h3>
     <label>Nombre o número<input id="newTableName" type="text" placeholder="Ej: Mesa 5"></label>
+    <label>Asientos disponibles (opcional)<input id="newTableCapacity" type="number" min="0" placeholder="Ej: 8"></label>
+    <label>Etiqueta (opcional)<input id="newTableLabel" type="text" placeholder="Ej: Familia Pérez"></label>
     <div class="modal-actions">
+      <button id="btnDeleteTable" class="btn-danger hidden">Eliminar mesa</button>
       <div class="spacer"></div>
       <button id="btnCancelTable" class="btn-ghost">Cancelar</button>
-      <button id="btnSaveTable" class="btn-primary">Crear</button>
+      <button id="btnSaveTable" class="btn-primary">Guardar</button>
+    </div>
+  </div>
+</div>
+
+<!-- Modal: detalle de mesa -->
+<div id="modalTableDetail" class="modal hidden">
+  <div class="modal-card modal-card-tall">
+    <div class="table-detail-head">
+      <div>
+        <h3 id="detailTableName">Mesa</h3>
+        <p id="detailTableOccupancy" class="hint"></p>
+      </div>
+      <button id="btnEditTable" class="icon-btn" aria-label="Editar mesa">✎</button>
+    </div>
+    <ul id="detailGuestList" class="guest-list"></ul>
+    <p id="detailEmpty" class="empty-state hidden">Ninguna mesa tiene invitados todavía.</p>
+    <div class="modal-actions">
+      <div class="spacer"></div>
+      <button id="btnCloseTableDetail" class="btn-ghost">Cerrar</button>
     </div>
   </div>
 </div>
