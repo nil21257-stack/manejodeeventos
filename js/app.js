@@ -21,9 +21,10 @@
   function renderHeader() {
     const ev = DB.event;
     $('#eventTitle').textContent = ev.name || 'Mi evento';
-    const dateStr = ev.date
+    let dateStr = ev.date
       ? new Date(ev.date + 'T00:00').toLocaleDateString('es-DO', { day: 'numeric', month: 'long', year: 'numeric' })
       : 'Sin fecha definida';
+    if (ev.hora) dateStr += `, ${ev.hora}`;
     $('#eventSubtitle').textContent = ev.lugar ? `${dateStr} · ${ev.lugar}` : dateStr;
   }
 
@@ -326,17 +327,123 @@
   });
 
   $('#btnShareSummary').addEventListener('click', () => {
-    const ev = DB.event;
-    const tables = DB.tables.slice().sort((a, b) => a.name.localeCompare(b.name, 'es', { numeric: true }));
-    let text = `${ev.name || 'Mi evento'}${ev.date ? ' — ' + ev.date : ''}${ev.lugar ? ' — ' + ev.lugar : ''}\n`;
-    text += `${DB.guests.length} invitados en ${tables.length} mesas\n\n`;
-    tables.forEach(t => {
-      const guests = DB.guestsInTable(t.name);
-      text += `${t.name}${t.capacidad != null ? ` (${guests.length}/${t.capacidad})` : ` (${guests.length})`}\n`;
+    $('#modalShareOptions').classList.remove('hidden');
+  });
+  $('#btnCancelShareOptions').addEventListener('click', () => $('#modalShareOptions').classList.add('hidden'));
+
+  function loadScriptOnce(src, globalCheck) {
+    return new Promise((resolve, reject) => {
+      if (globalCheck()) { resolve(); return; }
+      const s = document.createElement('script');
+      s.src = src;
+      s.onload = () => resolve();
+      s.onerror = reject;
+      document.head.appendChild(s);
     });
-    const sinMesa = DB.guests.filter(g => !g.mesa).length;
-    if (sinMesa) text += `\nSin mesa asignada: ${sinMesa}\n`;
-    shareText(text, ev.name);
+  }
+
+  async function shareOrDownloadFile(blob, filename, mimeLabel) {
+    const file = new File([blob], filename, { type: blob.type });
+    if (navigator.canShare && navigator.canShare({ files: [file] })) {
+      try {
+        await navigator.share({ files: [file], title: filename });
+        return;
+      } catch (e) { /* si cancela el share, cae al descargar */ }
+    }
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filename;
+    a.click();
+    URL.revokeObjectURL(url);
+    toast(`${mimeLabel} descargado — ya puedes compartirlo desde tus archivos`);
+  }
+
+  $('#btnGeneratePdf').addEventListener('click', async () => {
+    $('#modalShareOptions').classList.add('hidden');
+    toast('Generando PDF…');
+    try {
+      await loadScriptOnce('vendor/jspdf.umd.min.js', () => window.jspdf && window.jspdf.jsPDF);
+      const { jsPDF } = window.jspdf;
+      const doc = new jsPDF({ unit: 'pt', format: 'a4' });
+      const pageW = doc.internal.pageSize.getWidth();
+      const pageH = doc.internal.pageSize.getHeight();
+      const marginX = 48;
+      let y = 60;
+
+      const ev = DB.event;
+      const tables = DB.tables.slice().sort((a, b) => a.name.localeCompare(b.name, 'es', { numeric: true }));
+      const sinMesa = DB.guests.filter(g => !g.mesa);
+
+      function ensureSpace(lines) {
+        if (y + lines * 16 > pageH - 50) { doc.addPage(); y = 60; }
+      }
+
+      doc.setFont('helvetica', 'bold'); doc.setFontSize(20);
+      doc.text(ev.name || 'Mi evento', marginX, y); y += 26;
+
+      doc.setFont('helvetica', 'normal'); doc.setFontSize(11); doc.setTextColor(90);
+      let subtitle = '';
+      if (ev.date) subtitle += new Date(ev.date + 'T00:00').toLocaleDateString('es-DO', { day: 'numeric', month: 'long', year: 'numeric' });
+      if (ev.hora) subtitle += (subtitle ? ', ' : '') + ev.hora;
+      if (ev.lugar) subtitle += (subtitle ? ' — ' : '') + ev.lugar;
+      if (subtitle) { doc.text(subtitle, marginX, y); y += 18; }
+      doc.text(`${DB.guests.length} invitados · ${tables.length} mesas`, marginX, y); y += 26;
+      doc.setTextColor(0);
+
+      tables.forEach(t => {
+        const guests = DB.guestsInTable(t.name).sort((a, b) => a.nombre.localeCompare(b.nombre, 'es'));
+        ensureSpace(3);
+        doc.setDrawColor(210); doc.line(marginX, y, pageW - marginX, y); y += 18;
+        doc.setFont('helvetica', 'bold'); doc.setFontSize(13);
+        const occ = t.capacidad != null ? ` (${guests.length}/${t.capacidad})` : ` (${guests.length})`;
+        doc.text(`${t.name}${t.etiqueta ? ' — ' + t.etiqueta : ''}${occ}`, marginX, y); y += 18;
+        doc.setFont('helvetica', 'normal'); doc.setFontSize(11);
+        if (!guests.length) { doc.setTextColor(140); doc.text('(sin invitados)', marginX + 12, y); doc.setTextColor(0); y += 16; }
+        guests.forEach((g, i) => {
+          ensureSpace(1);
+          const label = `${i + 1}. ${g.titulo ? g.titulo + ' ' : ''}${g.nombre}${g.llego ? '  ✓' : ''}`;
+          doc.text(label, marginX + 12, y);
+          y += 15;
+        });
+        y += 10;
+      });
+
+      if (sinMesa.length) {
+        ensureSpace(3);
+        doc.setDrawColor(210); doc.line(marginX, y, pageW - marginX, y); y += 18;
+        doc.setFont('helvetica', 'bold'); doc.setFontSize(13);
+        doc.text(`Sin mesa asignada (${sinMesa.length})`, marginX, y); y += 18;
+        doc.setFont('helvetica', 'normal'); doc.setFontSize(11);
+        sinMesa.forEach((g, i) => {
+          ensureSpace(1);
+          doc.text(`${i + 1}. ${g.titulo ? g.titulo + ' ' : ''}${g.nombre}`, marginX + 12, y);
+          y += 15;
+        });
+      }
+
+      const blob = doc.output('blob');
+      const filename = `${(ev.name || 'evento').toLowerCase().replace(/[^a-z0-9]+/g, '-')}.pdf`;
+      await shareOrDownloadFile(blob, filename, 'PDF');
+    } catch (err) {
+      console.error(err);
+      alert('No se pudo generar el PDF.');
+    }
+  });
+
+  $('#btnGenerateCsv').addEventListener('click', async () => {
+    $('#modalShareOptions').classList.add('hidden');
+    const csvEscape = v => {
+      const s = String(v ?? '');
+      return /[",\n]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s;
+    };
+    const rows = [['Nombre', 'Mesa']];
+    DB.guests.forEach(g => rows.push([g.nombre, g.mesa || '']));
+    const csv = rows.map(r => r.map(csvEscape).join(',')).join('\r\n');
+    const blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8' });
+    const ev = DB.event;
+    const filename = `invitados-${(ev.name || 'evento').toLowerCase().replace(/[^a-z0-9]+/g, '-')}.csv`;
+    await shareOrDownloadFile(blob, filename, 'CSV');
   });
 
   // ---------------- Imprimir plano de mesas ----------------
@@ -501,6 +608,7 @@
   $('#btnSettings').addEventListener('click', () => {
     $('#settingsEventName').value = DB.event.name || '';
     $('#settingsEventDate').value = DB.event.date || '';
+    $('#settingsEventHora').value = DB.event.hora || '';
     $('#settingsEventLugar').value = DB.event.lugar || '';
     renderInvitationBox();
     renderEventsList();
@@ -508,7 +616,7 @@
   });
   $('#btnCancelSettings').addEventListener('click', () => $('#modalSettings').classList.add('hidden'));
   $('#btnSaveSettings').addEventListener('click', () => {
-    DB.saveEvent($('#settingsEventName').value, $('#settingsEventDate').value, $('#settingsEventLugar').value);
+    DB.saveEvent($('#settingsEventName').value, $('#settingsEventDate').value, $('#settingsEventLugar').value, $('#settingsEventHora').value);
     $('#modalSettings').classList.add('hidden');
     renderHeader();
     toast('Ajustes guardados');
@@ -805,7 +913,7 @@
   function renderInvitationBox() {
     const img = DB.event.invitacion;
     $('#invitationBox').classList.toggle('hidden', !img);
-    $('#invitationOcrText').classList.add('hidden');
+    $('#invitationDetected').classList.add('hidden');
     $('#invitationOcrStatus').classList.add('hidden');
     if (img) $('#invitationThumb').src = img;
   }
@@ -845,10 +953,9 @@
     const dataUrl = DB.event.invitacion;
     if (!dataUrl) return;
     const statusEl = $('#invitationOcrStatus');
-    statusEl.classList.remove('hidden');
-    statusEl.classList.remove('error');
-    statusEl.textContent = 'Leyendo texto de la invitación…';
-    $('#invitationOcrText').classList.add('hidden');
+    statusEl.classList.remove('hidden', 'error');
+    statusEl.textContent = 'Detectando datos de la invitación…';
+    $('#invitationDetected').classList.add('hidden');
     try {
       const blob = await (await fetch(dataUrl)).blob();
       const { rawText } = await Importers.parseImage(blob, m => {
@@ -858,13 +965,29 @@
       });
       statusEl.classList.add('hidden');
       if (!rawText.trim()) { toast('No se detectó texto en la imagen'); return; }
+      const found = Importers.parseInvitation(rawText);
+      $('#detNombre').value = found.nombre || '';
+      $('#detFecha').value = found.fecha || '';
+      $('#detHora').value = found.hora || '';
+      $('#detLugar').value = found.lugar || '';
       $('#invitationOcrText').value = rawText;
-      $('#invitationOcrText').classList.remove('hidden');
+      $('#invitationDetected').classList.remove('hidden');
+      if (!found.fecha && !found.hora && !found.lugar) {
+        toast('No se pudo identificar fecha/hora/lugar con certeza — revisa el texto completo abajo');
+      }
     } catch (err) {
       console.error(err);
       statusEl.textContent = 'No se pudo leer el texto de la imagen.';
       statusEl.classList.add('error');
     }
+  });
+  $('#btnApplyDetected').addEventListener('click', () => {
+    if ($('#detNombre').value.trim()) $('#settingsEventName').value = $('#detNombre').value.trim();
+    if ($('#detFecha').value) $('#settingsEventDate').value = $('#detFecha').value;
+    if ($('#detHora').value) $('#settingsEventHora').value = $('#detHora').value;
+    if ($('#detLugar').value.trim()) $('#settingsEventLugar').value = $('#detLugar').value.trim();
+    $('#invitationDetected').classList.add('hidden');
+    toast('Datos aplicados — recuerda tocar "Guardar" para confirmarlos');
   });
 
   // ---------------- Render global ----------------

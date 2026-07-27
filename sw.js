@@ -1,5 +1,5 @@
 // sw.js — Cachea todo lo necesario para que la app funcione 100% offline tras la primera visita.
-const CACHE_VERSION = 'eventos-v11';
+const CACHE_VERSION = 'eventos-v13';
 const ASSETS = [
   './',
   './index.html',
@@ -12,6 +12,7 @@ const ASSETS = [
   './icons/icon-512.png',
   './icons/apple-touch-icon.png',
   './vendor/xlsx.full.min.js',
+  './vendor/jspdf.umd.min.js',
   './vendor/pdf.min.mjs',
   './vendor/pdf.worker.min.mjs',
   './vendor/tesseract.min.js',

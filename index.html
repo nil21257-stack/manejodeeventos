@@ -246,26 +246,43 @@
   <div class="modal-card">
     <h3>Ajustes del evento</h3>
     <label>Nombre del evento<input id="settingsEventName" type="text" placeholder="Ej: Boda de Ana y Luis"></label>
-    <label>Fecha<input id="settingsEventDate" type="date"></label>
+    <div class="field-row">
+      <label>Fecha<input id="settingsEventDate" type="date"></label>
+      <label>Hora<input id="settingsEventHora" type="time"></label>
+    </div>
     <label>Lugar (opcional)<input id="settingsEventLugar" type="text" placeholder="Ej: Salón Las Palmas, Santiago"></label>
 
     <label>Invitación del evento (opcional)</label>
-    <p class="hint">Sube una foto de la invitación para tenerla a mano y, si quieres, extraer el texto para copiar la fecha o el lugar exactos.</p>
+    <p class="hint">Sube una foto de la invitación. La app intenta leer el nombre, la fecha, la hora y el lugar automáticamente para que solo confirmes o corrijas.</p>
     <div id="invitationBox" class="invitation-box hidden">
       <img id="invitationThumb" alt="Invitación del evento">
       <div class="invitation-actions">
-        <button id="btnOcrInvitation" class="btn-ghost">Leer texto (OCR)</button>
+        <button id="btnOcrInvitation" class="btn-ghost">Detectar datos (OCR)</button>
         <button id="btnRemoveInvitation" class="btn-danger">Quitar</button>
       </div>
     </div>
     <button id="btnUploadInvitation" class="btn-ghost full">📎 Subir imagen de la invitación</button>
     <input type="file" id="fileInvitation" accept="image/*" class="hidden">
     <div id="invitationOcrStatus" class="import-status hidden"></div>
-    <textarea id="invitationOcrText" rows="4" class="hidden" placeholder="Texto detectado…" readonly></textarea>
+
+    <div id="invitationDetected" class="invitation-detected hidden">
+      <p class="hint">Esto es lo que la app pudo leer — revisa y corrige antes de aplicar:</p>
+      <label>Nombre detectado<input id="detNombre" type="text"></label>
+      <div class="field-row">
+        <label>Fecha detectada<input id="detFecha" type="date"></label>
+        <label>Hora detectada<input id="detHora" type="time"></label>
+      </div>
+      <label>Lugar detectado<input id="detLugar" type="text"></label>
+      <button id="btnApplyDetected" class="btn-primary full">Usar estos datos</button>
+      <details class="raw-text-details">
+        <summary>Ver todo el texto leído</summary>
+        <textarea id="invitationOcrText" rows="4" readonly></textarea>
+      </details>
+    </div>
 
     <div class="modal-actions">
       <button id="btnExportBackup" class="btn-ghost">Exportar respaldo</button>
-      <button id="btnShareSummary" class="btn-ghost">Compartir resumen</button>
+      <button id="btnShareSummary" class="btn-ghost">Compartir / Exportar</button>
       <div class="spacer"></div>
       <button id="btnCancelSettings" class="btn-ghost">Cerrar</button>
       <button id="btnSaveSettings" class="btn-primary">Guardar</button>
@@ -282,6 +299,32 @@
 </div>
 
 <div id="toast" class="toast hidden"></div>
+
+<!-- Modal: elegir formato para compartir/exportar -->
+<div id="modalShareOptions" class="modal hidden">
+  <div class="modal-card">
+    <h3>Compartir / Exportar</h3>
+    <p class="hint">Elige qué quieres generar:</p>
+    <button id="btnGeneratePdf" class="share-option-btn">
+      <span class="share-option-icon">📄</span>
+      <span class="share-option-text">
+        <strong>Resumen en PDF</strong>
+        <small>Nombre del evento, fecha, lugar, todas las mesas e invitados — listo para imprimir o enviar</small>
+      </span>
+    </button>
+    <button id="btnGenerateCsv" class="share-option-btn">
+      <span class="share-option-icon">📊</span>
+      <span class="share-option-text">
+        <strong>Lista en CSV</strong>
+        <small>Para que otra persona con esta app lo importe directo en Importar → Excel/CSV</small>
+      </span>
+    </button>
+    <div class="modal-actions">
+      <div class="spacer"></div>
+      <button id="btnCancelShareOptions" class="btn-ghost">Cerrar</button>
+    </div>
+  </div>
+</div>
 
 <!-- Área de impresión: solo visible al imprimir (ver CSS @media print) -->
 <div id="printArea"></div>

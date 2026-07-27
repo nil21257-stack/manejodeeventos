@@ -135,6 +135,7 @@ const DB = {
     }
     if (!this._data.event) this._data.event = { name: 'Mi evento', date: '' };
     if (this._data.event.lugar === undefined) this._data.event.lugar = '';
+    if (this._data.event.hora === undefined) this._data.event.hora = '';
     if (this._data.event.invitacion === undefined) this._data.event.invitacion = null; // dataURL base64 o null
     if (!Array.isArray(this._data.guests)) this._data.guests = [];
     if (!Array.isArray(this._data.tables)) this._data.tables = [];
@@ -169,12 +170,13 @@ const DB = {
   get guests() { return this.load().guests; },
   get tables() { return this.load().tables; },
 
-  saveEvent(name, date, lugar) {
+  saveEvent(name, date, lugar, hora) {
     const prev = this.load().event;
     this._data.event = {
       name: name || 'Mi evento',
       date: date || '',
       lugar: (lugar !== undefined ? lugar : prev.lugar) || '',
+      hora: (hora !== undefined ? hora : prev.hora) || '',
       invitacion: prev.invitacion || null
     };
     this.save();

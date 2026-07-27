@@ -190,5 +190,82 @@ const Importers = {
     });
 
     return rows;
+  },
+
+  // ---------- Parser de invitación: intenta identificar nombre/fecha/hora/lugar ----------
+  // Es un best-effort (no hay dos invitaciones diseñadas igual), por eso todo se devuelve
+  // para que el usuario lo revise y edite antes de aplicarlo a los campos del evento.
+  parseInvitation(text) {
+    const MESES = {
+      enero: 1, febrero: 2, marzo: 3, abril: 4, mayo: 5, junio: 6, julio: 7,
+      agosto: 8, septiembre: 9, setiembre: 9, octubre: 10, noviembre: 11, diciembre: 12
+    };
+    const pad = n => String(n).padStart(2, '0');
+    const lines = text.split('\n').map(l => l.trim()).filter(Boolean);
+    const joined = text;
+
+    // --- Fecha ---
+    let fecha = '';
+    let m = joined.match(/(\d{1,2})\s+de\s+([a-záéíóúñ]+)\s+(?:de\s+)?(\d{4})?/i);
+    if (m) {
+      const day = parseInt(m[1], 10);
+      const monthName = m[2].toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+      const month = MESES[monthName];
+      let year = m[3] ? parseInt(m[3], 10) : null;
+      if (month && day >= 1 && day <= 31) {
+        if (!year) {
+          const now = new Date();
+          year = now.getFullYear();
+          if (new Date(year, month - 1, day) < now) year += 1;
+        }
+        fecha = `${year}-${pad(month)}-${pad(day)}`;
+      }
+    }
+    if (!fecha) {
+      m = joined.match(/\b(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{2,4})\b/);
+      if (m) {
+        let d = parseInt(m[1], 10), mo = parseInt(m[2], 10), y = parseInt(m[3], 10);
+        if (y < 100) y += 2000;
+        if (mo >= 1 && mo <= 12 && d >= 1 && d <= 31) fecha = `${y}-${pad(mo)}-${pad(d)}`;
+      }
+    }
+
+    // --- Hora ---
+    let hora = '';
+    m = joined.match(/\b(1[0-2]|0?[1-9])(?::([0-5]\d))?\s*([ap]\.?\s*m\.?)\b/i);
+    if (m) {
+      let h = parseInt(m[1], 10);
+      const min = m[2] || '00';
+      const ampm = m[3].toLowerCase().replace(/[.\s]/g, '');
+      if (ampm.startsWith('p') && h !== 12) h += 12;
+      if (ampm.startsWith('a') && h === 12) h = 0;
+      hora = `${pad(h)}:${min}`;
+    } else {
+      m = joined.match(/\b([01]?\d|2[0-3]):([0-5]\d)\s*(?:hrs?|horas?)?\b/i);
+      if (m) hora = `${pad(parseInt(m[1], 10))}:${m[2]}`;
+    }
+
+    // --- Lugar ---
+    let lugar = '';
+    const lugarLabel = lines.find(l => /^(lugar|direcci[oó]n|ubicaci[oó]n)\s*[:\-]/i.test(l));
+    if (lugarLabel) {
+      lugar = lugarLabel.replace(/^(lugar|direcci[oó]n|ubicaci[oó]n)\s*[:\-]\s*/i, '').trim();
+    } else {
+      const kwRegex = /sal[oó]n|club|hotel|restaurante|jard[ií]n|iglesia|parroquia|quinta|villa|plaza|terraza|centro de eventos|hall/i;
+      const kwLine = lines.find(l => kwRegex.test(l));
+      if (kwLine) lugar = kwLine;
+    }
+
+    // --- Nombre del evento (mejor esfuerzo: primera línea con contenido real) ---
+    let nombre = '';
+    for (const l of lines) {
+      if (l === lugar) continue;
+      if (/^\d{1,2}\s+de\s+/i.test(l)) continue;
+      if (l.replace(/\W/g, '').length < 3) continue;
+      nombre = l;
+      break;
+    }
+
+    return { nombre, fecha, hora, lugar, rawText: text };
   }
 };
