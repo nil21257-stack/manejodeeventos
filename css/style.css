@@ -132,6 +132,21 @@ main{max-width:640px;margin:0 auto;padding:16px 16px 24px;}
 .guest-table.unassigned{color:var(--paper-dim);font-style:italic;}
 .guest-row .chevron{color:var(--paper-dim);font-size:16px;}
 
+/* Invitados que ya llegaron: nombre en "marca de agua" para diferenciarlos de un vistazo */
+.guest-row.arrived{background:linear-gradient(155deg, rgba(92,143,107,.07), transparent 40%), var(--ink-2);}
+.guest-row.arrived .guest-name{
+  color:var(--paper-dim);
+  opacity:.6;
+}
+@supports (-webkit-text-stroke: 1px black){
+  .guest-row.arrived .guest-name{
+    color:transparent;
+    -webkit-text-stroke:1px rgba(228,207,160,.35);
+    opacity:1;
+  }
+}
+.guest-row.arrived .guest-table{opacity:.55;}
+
 .empty-state{
   text-align:center;color:var(--paper-dim);padding:40px 20px;line-height:1.6;font-size:14px;
 }

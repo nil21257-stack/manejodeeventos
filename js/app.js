@@ -37,7 +37,7 @@
 
   function buildGuestRow(g, onCheckinToggle) {
     const li = document.createElement('li');
-    li.className = 'guest-row' + (selectionMode ? ' selectable' : '');
+    li.className = 'guest-row' + (g.llego ? ' arrived' : '') + (selectionMode ? ' selectable' : '');
 
     if (selectionMode) {
       const checked = selectedIds.has(g.id);
@@ -758,7 +758,7 @@
     list.innerHTML = '';
     guests.forEach(g => {
       const li = document.createElement('li');
-      li.className = 'guest-row';
+      li.className = 'guest-row' + (g.llego ? ' arrived' : '');
       li.innerHTML = `
         <div class="guest-avatar ${g.llego ? 'checked' : ''}">${g.llego ? '✓' : (initials(g.nombre) || '?')}</div>
         <div class="guest-info">
