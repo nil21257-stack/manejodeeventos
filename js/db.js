@@ -140,6 +140,7 @@ const DB = {
       if (typeof g.llego !== 'boolean') g.llego = false;
       if (g.titulo === undefined) g.titulo = '';
       if (g.nota === undefined) g.nota = '';
+      if (g.confirmado === undefined) g.confirmado = ''; // '', 'si', 'no'
     });
     this._data.tables.forEach(t => {
       if (t.capacidad === undefined) t.capacidad = null;
@@ -173,14 +174,25 @@ const DB = {
     return this.guests.filter(g => g.id !== excludeId && normalizeName(g.nombre) === n);
   },
 
-  addGuest(nombre, mesa, llego, titulo, nota) {
+  // ---------- Deshacer ----------
+  snapshot() {
+    return JSON.parse(JSON.stringify(this.load()));
+  },
+
+  restoreSnapshot(snap) {
+    this._data = JSON.parse(JSON.stringify(snap));
+    this.save();
+  },
+
+  addGuest(nombre, mesa, llego, titulo, nota, confirmado) {
     const g = {
       id: newId('g'),
       nombre: nombre.trim(),
       mesa: (mesa || '').trim(),
       llego: !!llego,
       titulo: (titulo || '').trim(),
-      nota: (nota || '').trim()
+      nota: (nota || '').trim(),
+      confirmado: confirmado || ''
     };
     this.load().guests.push(g);
     this._ensureTable(g.mesa);
@@ -188,13 +200,14 @@ const DB = {
     return g;
   },
 
-  updateGuest(id, nombre, mesa, titulo, nota) {
+  updateGuest(id, nombre, mesa, titulo, nota, confirmado) {
     const g = this.guests.find(x => x.id === id);
     if (!g) return;
     g.nombre = nombre.trim();
     g.mesa = (mesa || '').trim();
     if (titulo !== undefined) g.titulo = (titulo || '').trim();
     if (nota !== undefined) g.nota = (nota || '').trim();
+    if (confirmado !== undefined) g.confirmado = confirmado || '';
     this._ensureTable(g.mesa);
     this.save();
   },
@@ -273,6 +286,28 @@ const DB = {
 
   guestsInTable(tableName) {
     return this.guests.filter(g => g.mesa.toLowerCase() === tableName.toLowerCase());
+  },
+
+  findTableByName(name) {
+    const n = (name || '').trim().toLowerCase();
+    if (!n) return null;
+    return this.tables.find(t => t.name.toLowerCase() === n) || null;
+  },
+
+  // Devuelve null si la mesa no existe o no tiene capacidad definida (sin límite).
+  // Si existe con capacidad, devuelve {capacidad, ocupados, disponibles, llena}.
+  tableAvailability(name, excludeGuestId) {
+    const t = this.findTableByName(name);
+    if (!t || t.capacidad == null) return null;
+    const ocupados = this.guestsInTable(t.name).filter(g => g.id !== excludeGuestId).length;
+    return { capacidad: t.capacidad, ocupados, disponibles: t.capacidad - ocupados, llena: ocupados >= t.capacidad };
+  },
+
+  overbookedTables() {
+    return this.tables
+      .filter(t => t.capacidad != null)
+      .map(t => ({ table: t, ocupados: this.guestsInTable(t.name).length }))
+      .filter(x => x.ocupados > x.table.capacidad);
   },
 
   bulkImport(rows, replace) {

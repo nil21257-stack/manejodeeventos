@@ -27,7 +27,10 @@
       <p id="eventSubtitle" class="subtitle">Sin fecha definida</p>
     </div>
   </div>
-  <button id="btnSettings" class="icon-btn" aria-label="Ajustes del evento" title="Ajustes">⚙</button>
+  <div class="header-actions">
+    <button id="btnReception" class="icon-btn" aria-label="Modo recepción" title="Modo recepción">👁</button>
+    <button id="btnSettings" class="icon-btn" aria-label="Ajustes del evento" title="Ajustes">⚙</button>
+  </div>
 </header>
 
 <main id="views">
@@ -40,6 +43,7 @@
         <div class="stat"><strong id="statMesas">0</strong><span>mesas</span></div>
         <div class="stat"><strong id="statSinMesa">0</strong><span>sin mesa</span></div>
         <div class="stat"><strong id="statLlegaron">0</strong><span>llegaron</span></div>
+        <div class="stat"><strong id="statConfirmados">0</strong><span>confirmados</span></div>
       </div>
       <input id="searchInput" type="search" placeholder="Buscar invitado…" autocomplete="off">
       <div class="filter-chips">
@@ -67,7 +71,10 @@
   <section id="view-mesas" class="view">
     <div class="view-head">
       <h2 class="view-title">Plano de mesas</h2>
-      <button id="btnAddTable" class="btn-ghost">+ Mesa</button>
+      <div class="view-head-actions">
+        <button id="btnPrintPlan" class="btn-ghost">🖨 Imprimir</button>
+        <button id="btnAddTable" class="btn-ghost">+ Mesa</button>
+      </div>
     </div>
     <div id="tablesFloor" class="tables-floor"></div>
     <p id="emptyTables" class="empty-state hidden">
@@ -157,6 +164,13 @@
     </datalist>
     <label>Mesa<input id="guestTableInput" type="text" placeholder="Ej: Mesa 3, Familia López…" list="tableSuggestions"></label>
     <datalist id="tableSuggestions"></datalist>
+    <label>Confirmación (opcional)
+      <select id="guestConfirmadoInput">
+        <option value="">Sin definir</option>
+        <option value="si">Confirmó que viene</option>
+        <option value="no">Confirmó que NO viene</option>
+      </select>
+    </label>
     <label>Nota especial (opcional)<textarea id="guestNotaInput" rows="2" placeholder="Ej: Alergia a mariscos, silla de ruedas, viene con bebé…"></textarea></label>
     <div class="modal-actions">
       <button id="btnDeleteGuest" class="btn-danger hidden">Eliminar</button>
@@ -206,8 +220,12 @@
         <h3 id="detailTableName">Mesa</h3>
         <p id="detailTableOccupancy" class="hint"></p>
       </div>
-      <button id="btnEditTable" class="icon-btn" aria-label="Editar mesa">✎</button>
+      <div class="table-detail-actions">
+        <button id="btnShareTable" class="icon-btn" aria-label="Compartir lista">↗</button>
+        <button id="btnEditTable" class="icon-btn" aria-label="Editar mesa">✎</button>
+      </div>
     </div>
+    <input id="detailSearchInput" type="search" placeholder="Buscar en esta mesa…" autocomplete="off">
     <ul id="detailGuestList" class="guest-list"></ul>
     <p id="detailEmpty" class="empty-state hidden">Ninguna mesa tiene invitados todavía.</p>
     <div class="modal-actions">
@@ -225,6 +243,7 @@
     <label>Fecha<input id="settingsEventDate" type="date"></label>
     <div class="modal-actions">
       <button id="btnExportBackup" class="btn-ghost">Exportar respaldo</button>
+      <button id="btnShareSummary" class="btn-ghost">Compartir resumen</button>
       <div class="spacer"></div>
       <button id="btnCancelSettings" class="btn-ghost">Cerrar</button>
       <button id="btnSaveSettings" class="btn-primary">Guardar</button>
@@ -241,6 +260,22 @@
 </div>
 
 <div id="toast" class="toast hidden"></div>
+
+<!-- Área de impresión: solo visible al imprimir (ver CSS @media print) -->
+<div id="printArea"></div>
+
+<!-- Modo recepción: vista simplificada de solo búsqueda + marcar llegada -->
+<div id="receptionMode" class="reception-mode hidden">
+  <div class="reception-head">
+    <h2 id="receptionEventName">Recepción</h2>
+    <button id="btnExitReception" class="btn-ghost">Salir</button>
+  </div>
+  <input id="receptionSearch" type="search" placeholder="Buscar invitado por nombre…" autocomplete="off">
+  <div class="reception-stats">
+    <span id="receptionStat"></span>
+  </div>
+  <ul id="receptionList" class="guest-list reception-list"></ul>
+</div>
 
 <script src="vendor/xlsx.full.min.js"></script>
 <script src="js/db.js"></script>
