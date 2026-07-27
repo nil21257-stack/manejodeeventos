@@ -142,8 +142,22 @@
   <div class="modal-card">
     <h3 id="modalGuestTitle">Nuevo invitado</h3>
     <label>Nombre<input id="guestNameInput" type="text" placeholder="Nombre del invitado"></label>
+    <label>Título (opcional)<input id="guestTituloInput" type="text" placeholder="Ej: Ing., Lic., Dr., Sra." list="tituloSuggestions"></label>
+    <datalist id="tituloSuggestions">
+      <option value="Sr.">
+      <option value="Sra.">
+      <option value="Srta.">
+      <option value="Dr.">
+      <option value="Dra.">
+      <option value="Ing.">
+      <option value="Lic.">
+      <option value="Licda.">
+      <option value="Padre">
+      <option value="Pastor">
+    </datalist>
     <label>Mesa<input id="guestTableInput" type="text" placeholder="Ej: Mesa 3, Familia López…" list="tableSuggestions"></label>
     <datalist id="tableSuggestions"></datalist>
+    <label>Nota especial (opcional)<textarea id="guestNotaInput" rows="2" placeholder="Ej: Alergia a mariscos, silla de ruedas, viene con bebé…"></textarea></label>
     <div class="modal-actions">
       <button id="btnDeleteGuest" class="btn-danger hidden">Eliminar</button>
       <div class="spacer"></div>

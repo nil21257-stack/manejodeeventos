@@ -70,7 +70,8 @@ const Importers = {
   // ---------- OCR (foto/escaneo) ----------
   async parseImage(file, onProgress) {
     if (!window.Tesseract) await this._loadScript('vendor/tesseract.min.js', false);
-    const resized = await this._downscaleImage(file, 1800);
+    if (onProgress) onProgress({ status: 'preparing', progress: 0 });
+    const resized = await this._downscaleImage(file, 1600);
     const worker = await Tesseract.createWorker('spa', 1, {
       workerPath: 'vendor/worker.min.js',
       corePath: 'vendor/tesseract-core-simd-lstm.js',
@@ -89,22 +90,52 @@ const Importers = {
 
   // Reduce fotos de cámara (a menudo 12MP+) a un lado máximo razonable para leer texto.
   // Esto acelera el OCR drásticamente sin perder legibilidad del texto.
-  _downscaleImage(file, maxSide) {
-    return new Promise((resolve, reject) => {
+  // Usa createImageBitmap cuando está disponible (más rápido y liviano en celulares que
+  // decodificar con <img> + canvas), con un límite de tiempo para nunca quedarse colgado.
+  async _downscaleImage(file, maxSide) {
+    const withTimeout = (promise, ms) => Promise.race([
+      promise,
+      new Promise((_, rej) => setTimeout(() => rej(new Error('timeout')), ms))
+    ]);
+
+    try {
+      if ('createImageBitmap' in window) {
+        const bitmap = await withTimeout(createImageBitmap(file), 15000);
+        const scale = Math.min(1, maxSide / Math.max(bitmap.width, bitmap.height));
+        if (scale >= 1) { bitmap.close(); return file; }
+        const w = Math.round(bitmap.width * scale);
+        const h = Math.round(bitmap.height * scale);
+        const canvas = document.createElement('canvas');
+        canvas.width = w; canvas.height = h;
+        const ctx = canvas.getContext('2d');
+        ctx.drawImage(bitmap, 0, 0, w, h);
+        bitmap.close();
+        const blob = await new Promise(res => canvas.toBlob(res, 'image/jpeg', 0.88));
+        return blob || file;
+      }
+    } catch (e) {
+      console.warn('createImageBitmap falló o tardó demasiado, usando la imagen original:', e);
+      return file;
+    }
+
+    // Fallback para navegadores sin createImageBitmap
+    return new Promise((resolve) => {
       const img = new Image();
       const url = URL.createObjectURL(file);
+      const timer = setTimeout(() => { URL.revokeObjectURL(url); resolve(file); }, 15000);
       img.onload = () => {
+        clearTimeout(timer);
         URL.revokeObjectURL(url);
         const scale = Math.min(1, maxSide / Math.max(img.width, img.height));
-        if (scale >= 1) { resolve(file); return; } // ya es pequeña, no tocarla
+        if (scale >= 1) { resolve(file); return; }
         const canvas = document.createElement('canvas');
         canvas.width = Math.round(img.width * scale);
         canvas.height = Math.round(img.height * scale);
         const ctx = canvas.getContext('2d');
         ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-        canvas.toBlob(blob => resolve(blob || file), 'image/jpeg', 0.92);
+        canvas.toBlob(blob => resolve(blob || file), 'image/jpeg', 0.88);
       };
-      img.onerror = () => { URL.revokeObjectURL(url); resolve(file); }; // si falla, seguimos con el original
+      img.onerror = () => { clearTimeout(timer); URL.revokeObjectURL(url); resolve(file); };
       img.src = url;
     });
   },

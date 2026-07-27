@@ -47,8 +47,8 @@
           <div class="guest-name"></div>
           <div class="guest-table ${g.mesa ? '' : 'unassigned'}"></div>
         </div>`;
-      li.querySelector('.guest-name').textContent = g.nombre;
-      li.querySelector('.guest-table').textContent = g.mesa || 'Sin mesa asignada';
+      li.querySelector('.guest-name').textContent = g.titulo ? `${g.titulo} ${g.nombre}` : g.nombre;
+      li.querySelector('.guest-table').textContent = (g.mesa || 'Sin mesa asignada') + (g.nota ? ' 📝' : '');
       li.addEventListener('click', () => {
         if (selectedIds.has(g.id)) selectedIds.delete(g.id); else selectedIds.add(g.id);
         renderGuests();
@@ -63,8 +63,9 @@
         <div class="guest-table ${g.mesa ? '' : 'unassigned'}"></div>
       </div>
       <span class="chevron">›</span>`;
-    li.querySelector('.guest-name').textContent = g.nombre;
-    li.querySelector('.guest-table').textContent = g.mesa || 'Sin mesa asignada';
+    li.querySelector('.guest-name').textContent = g.titulo ? `${g.titulo} ${g.nombre}` : g.nombre;
+    li.querySelector('.guest-table').textContent = (g.mesa || 'Sin mesa asignada') + (g.nota ? ' 📝' : '');
+    if (g.nota) li.querySelector('.guest-table').title = g.nota;
     li.querySelector('.guest-avatar').addEventListener('click', ev => {
       ev.stopPropagation();
       DB.toggleCheckin(g.id);
@@ -152,12 +153,16 @@
       const g = DB.guests.find(x => x.id === id);
       $('#modalGuestTitle').textContent = 'Editar invitado';
       $('#guestNameInput').value = g.nombre;
+      $('#guestTituloInput').value = g.titulo || '';
       $('#guestTableInput').value = g.mesa;
+      $('#guestNotaInput').value = g.nota || '';
       $('#btnDeleteGuest').classList.remove('hidden');
     } else {
       $('#modalGuestTitle').textContent = 'Nuevo invitado';
       $('#guestNameInput').value = '';
+      $('#guestTituloInput').value = '';
       $('#guestTableInput').value = '';
+      $('#guestNotaInput').value = '';
       $('#btnDeleteGuest').classList.add('hidden');
     }
     fillTableSuggestions();
@@ -181,13 +186,15 @@
   $('#btnSaveGuest').addEventListener('click', () => {
     const nombre = $('#guestNameInput').value.trim();
     const mesa = $('#guestTableInput').value.trim();
+    const titulo = $('#guestTituloInput').value.trim();
+    const nota = $('#guestNotaInput').value.trim();
     if (!nombre) { toast('Escribe el nombre del invitado'); return; }
     const dups = DB.findDuplicates(nombre, editingGuestId);
     if (dups.length && !confirm(`Ya existe "${dups[0].nombre}"${dups[0].mesa ? ' en ' + dups[0].mesa : ''}. ¿Agregar de todas formas?`)) {
       return;
     }
-    if (editingGuestId) DB.updateGuest(editingGuestId, nombre, mesa);
-    else DB.addGuest(nombre, mesa);
+    if (editingGuestId) DB.updateGuest(editingGuestId, nombre, mesa, titulo, nota);
+    else DB.addGuest(nombre, mesa, false, titulo, nota);
     closeGuestModal();
     renderAll();
     toast('Guardado');
@@ -504,19 +511,27 @@
     e.target.value = '';
     if (!file) return;
     setStatus('Preparando imagen…');
+    const withTimeout = (promise, ms, msg) => Promise.race([
+      promise,
+      new Promise((_, rej) => setTimeout(() => rej(new Error(msg)), ms))
+    ]);
     try {
-      const { rawText } = await Importers.parseImage(file, m => {
-        if (m.status === 'recognizing text') {
-          setStatus(`Reconociendo texto… ${Math.round((m.progress || 0) * 100)}%`);
-        }
-      });
+      const { rawText } = await withTimeout(
+        Importers.parseImage(file, m => {
+          if (m.status === 'preparing') setStatus('Redimensionando foto…');
+          else if (m.status === 'loading tesseract core') setStatus('Cargando motor de reconocimiento…');
+          else if (m.status === 'recognizing text') setStatus(`Reconociendo texto… ${Math.round((m.progress || 0) * 100)}%`);
+        }),
+        75000,
+        'Tardó demasiado en procesar la imagen.'
+      );
       if (!rawText.trim()) { setStatus('No se detectó texto en la imagen. Intenta con mejor luz o más de cerca.', true); return; }
       $('#importStatus').classList.add('hidden');
       $('#rawTextArea').value = rawText;
       $('#importReview').classList.remove('hidden');
     } catch (err) {
       console.error(err);
-      setStatus('No se pudo procesar la imagen. Si es la primera vez, se necesita conexión para descargar el modelo de reconocimiento.', true);
+      setStatus('No se pudo procesar la imagen (tardó demasiado o falló el reconocimiento). Prueba con mejor luz, más cerca del texto, o usa "Pegar texto" como alternativa.', true);
     }
   });
 

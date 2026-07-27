@@ -136,7 +136,11 @@ const DB = {
     if (!this._data.event) this._data.event = { name: 'Mi evento', date: '' };
     if (!Array.isArray(this._data.guests)) this._data.guests = [];
     if (!Array.isArray(this._data.tables)) this._data.tables = [];
-    this._data.guests.forEach(g => { if (typeof g.llego !== 'boolean') g.llego = false; });
+    this._data.guests.forEach(g => {
+      if (typeof g.llego !== 'boolean') g.llego = false;
+      if (g.titulo === undefined) g.titulo = '';
+      if (g.nota === undefined) g.nota = '';
+    });
     this._data.tables.forEach(t => {
       if (t.capacidad === undefined) t.capacidad = null;
       if (t.etiqueta === undefined) t.etiqueta = '';
@@ -169,12 +173,14 @@ const DB = {
     return this.guests.filter(g => g.id !== excludeId && normalizeName(g.nombre) === n);
   },
 
-  addGuest(nombre, mesa, llego) {
+  addGuest(nombre, mesa, llego, titulo, nota) {
     const g = {
       id: newId('g'),
       nombre: nombre.trim(),
       mesa: (mesa || '').trim(),
-      llego: !!llego
+      llego: !!llego,
+      titulo: (titulo || '').trim(),
+      nota: (nota || '').trim()
     };
     this.load().guests.push(g);
     this._ensureTable(g.mesa);
@@ -182,11 +188,13 @@ const DB = {
     return g;
   },
 
-  updateGuest(id, nombre, mesa) {
+  updateGuest(id, nombre, mesa, titulo, nota) {
     const g = this.guests.find(x => x.id === id);
     if (!g) return;
     g.nombre = nombre.trim();
     g.mesa = (mesa || '').trim();
+    if (titulo !== undefined) g.titulo = (titulo || '').trim();
+    if (nota !== undefined) g.nota = (nota || '').trim();
     this._ensureTable(g.mesa);
     this.save();
   },
