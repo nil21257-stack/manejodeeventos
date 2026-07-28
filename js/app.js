@@ -5,6 +5,15 @@
   const $ = sel => document.querySelector(sel);
   const $$ = sel => Array.from(document.querySelectorAll(sel));
 
+  // Paleta de tonos joya dentro del mismo esquema esmeralda/oro/vino de la app —
+  // le da variedad a los avatares sin romper la identidad visual.
+  const AVATAR_PALETTE = ['#164C4A', '#4A2E4F', '#5C4A2E', '#2E3B5C', '#5C2E3B', '#2E5C46'];
+  function avatarColor(name) {
+    let hash = 0;
+    for (let i = 0; i < name.length; i++) hash = (hash * 31 + name.charCodeAt(i)) >>> 0;
+    return AVATAR_PALETTE[hash % AVATAR_PALETTE.length];
+  }
+
   let editingGuestId = null;
   let movingGuestId = null;
   let pendingImportRows = [];
@@ -68,6 +77,7 @@
     li.querySelector('.guest-name').textContent = g.titulo ? `${g.titulo} ${g.nombre}` : g.nombre;
     li.querySelector('.guest-table').textContent = (g.mesa || 'Sin mesa asignada') + (g.nota ? ' 📝' : '');
     if (g.nota) li.querySelector('.guest-table').title = g.nota;
+    if (!g.llego) li.querySelector('.guest-avatar').style.background = avatarColor(g.nombre);
     li.querySelector('.guest-avatar').addEventListener('click', ev => {
       ev.stopPropagation();
       DB.toggleCheckin(g.id);
@@ -886,6 +896,7 @@
         </div>`;
       li.querySelector('.guest-name').textContent = g.titulo ? `${g.titulo} ${g.nombre}` : g.nombre;
       li.querySelector('.guest-table').textContent = g.mesa || 'Sin mesa asignada';
+      if (!g.llego) li.querySelector('.guest-avatar').style.background = avatarColor(g.nombre);
       li.addEventListener('click', () => {
         DB.toggleCheckin(g.id);
         renderReceptionList();
@@ -1005,6 +1016,50 @@
     if ($('#detLugar').value.trim()) $('#settingsEventLugar').value = $('#detLugar').value.trim();
     $('#invitationDetected').classList.add('hidden');
     toast('Datos aplicados — recuerda tocar "Guardar" para confirmarlos');
+  });
+
+  // ---------------- Botones X de cerrar modal ----------------
+  $$('.modal-close-x, .modal-close-x-inline').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const target = $('#' + btn.dataset.close);
+      if (target) target.click();
+    });
+  });
+
+  // ---------------- Botón "atrás" del celular: no cerrar la app de una vez ----------------
+  let lastBackAttempt = 0;
+  history.pushState({ eventosApp: true }, '', location.href);
+
+  function closeTopModal() {
+    const openModal = document.querySelector('.modal:not(.hidden)');
+    if (!openModal) return false;
+    const xBtn = openModal.querySelector('.modal-close-x, .modal-close-x-inline');
+    if (xBtn) xBtn.click(); else openModal.classList.add('hidden');
+    return true;
+  }
+
+  window.addEventListener('popstate', () => {
+    if (!$('#receptionMode').classList.contains('hidden')) {
+      $('#btnExitReception').click();
+      history.pushState({ eventosApp: true }, '', location.href);
+      return;
+    }
+    if (closeTopModal()) {
+      history.pushState({ eventosApp: true }, '', location.href);
+      return;
+    }
+    const activeTab = document.querySelector('.tab-btn.active');
+    if (activeTab && activeTab.dataset.view !== 'invitados') {
+      showView('invitados');
+      history.pushState({ eventosApp: true }, '', location.href);
+      return;
+    }
+    // Ya estamos en la pantalla principal sin nada abierto: pide un segundo "atrás" para salir
+    const now = Date.now();
+    if (now - lastBackAttempt < 2000) return; // deja que la navegación siga (cierra/minimiza)
+    lastBackAttempt = now;
+    toast('Presiona atrás de nuevo para salir');
+    history.pushState({ eventosApp: true }, '', location.href);
   });
 
   // ---------------- Render global ----------------

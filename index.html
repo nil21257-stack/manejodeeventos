@@ -28,7 +28,7 @@
     </div>
   </div>
   <div class="header-actions">
-    <button id="btnReception" class="icon-btn" aria-label="Modo recepción" title="Modo recepción">👁</button>
+    <button id="btnReception" class="icon-btn" aria-label="Modo recepción" title="Modo recepción">✅</button>
     <button id="btnSettings" class="icon-btn" aria-label="Ajustes del evento" title="Ajustes">⚙</button>
   </div>
 </header>
@@ -88,12 +88,12 @@
 
     <div class="import-grid">
       <button class="import-card" data-mode="excel">
-        <span class="import-icon">▤</span>
+        <span class="import-icon">📊</span>
         <span>Excel / CSV</span>
         <small>.xlsx, .xls, .csv</small>
       </button>
       <button class="import-card" data-mode="pdf">
-        <span class="import-icon">▥</span>
+        <span class="import-icon">📄</span>
         <span>Documento PDF</span>
         <small>texto seleccionable</small>
       </button>
@@ -103,12 +103,12 @@
         <small>con la cámara</small>
       </button>
       <button class="import-card" data-mode="galeria">
-        <span class="import-icon">◎</span>
+        <span class="import-icon">🖼️</span>
         <span>Desde galería</span>
         <small>foto que ya tienes</small>
       </button>
       <button class="import-card" data-mode="texto">
-        <span class="import-icon">✎</span>
+        <span class="import-icon">📝</span>
         <span>Pegar texto</span>
         <small>manual</small>
       </button>
@@ -145,14 +145,15 @@
 </main>
 
 <nav class="tabbar">
-  <button class="tab-btn active" data-view="invitados"><span>☰</span>Invitados</button>
-  <button class="tab-btn" data-view="mesas"><span>◍</span>Mesas</button>
-  <button class="tab-btn" data-view="importar"><span>⇪</span>Importar</button>
+  <button class="tab-btn active" data-view="invitados"><span>👥</span>Invitados</button>
+  <button class="tab-btn" data-view="mesas"><span>🔘</span>Mesas</button>
+  <button class="tab-btn" data-view="importar"><span>📥</span>Importar</button>
 </nav>
 
 <!-- Modal: editar / crear invitado -->
 <div id="modalGuest" class="modal hidden">
   <div class="modal-card">
+    <button class="modal-close-x" data-close="btnCancelGuest" aria-label="Cerrar">✕</button>
     <h3 id="modalGuestTitle">Nuevo invitado</h3>
     <label>Nombre<input id="guestNameInput" type="text" placeholder="Nombre del invitado"></label>
     <label>Título (opcional)<input id="guestTituloInput" type="text" placeholder="Ej: Ing., Lic., Dr., Sra." list="tituloSuggestions"></label>
@@ -190,6 +191,7 @@
 <!-- Modal: mover invitado de mesa -->
 <div id="modalMove" class="modal hidden">
   <div class="modal-card">
+    <button class="modal-close-x" data-close="btnCancelMove" aria-label="Cerrar">✕</button>
     <h3>Mover a otra mesa</h3>
     <p id="moveGuestName" class="hint"></p>
     <div id="moveTableOptions" class="move-options"></div>
@@ -205,6 +207,7 @@
 <!-- Modal: nueva mesa -->
 <div id="modalTable" class="modal hidden">
   <div class="modal-card">
+    <button class="modal-close-x" data-close="btnCancelTable" aria-label="Cerrar">✕</button>
     <h3 id="modalTableTitle">Nueva mesa</h3>
     <label>Nombre o número<input id="newTableName" type="text" placeholder="Ej: Mesa 5"></label>
     <label>Asientos disponibles (opcional)<input id="newTableCapacity" type="number" min="0" placeholder="Ej: 8"></label>
@@ -227,8 +230,9 @@
         <p id="detailTableOccupancy" class="hint"></p>
       </div>
       <div class="table-detail-actions">
-        <button id="btnShareTable" class="icon-btn" aria-label="Compartir lista">↗</button>
+        <button id="btnShareTable" class="icon-btn" aria-label="Compartir lista">📤</button>
         <button id="btnEditTable" class="icon-btn" aria-label="Editar mesa">✎</button>
+        <button class="icon-btn modal-close-x-inline" data-close="btnCloseTableDetail" aria-label="Cerrar">✕</button>
       </div>
     </div>
     <input id="detailSearchInput" type="search" placeholder="Buscar en esta mesa…" autocomplete="off">
@@ -244,6 +248,7 @@
 <!-- Modal: ajustes -->
 <div id="modalSettings" class="modal hidden">
   <div class="modal-card">
+    <button class="modal-close-x" data-close="btnCancelSettings" aria-label="Cerrar">✕</button>
     <h3>Ajustes del evento</h3>
     <label>Nombre del evento<input id="settingsEventName" type="text" placeholder="Ej: Boda de Ana y Luis"></label>
     <div class="field-row">
@@ -303,6 +308,7 @@
 <!-- Modal: elegir formato para compartir/exportar -->
 <div id="modalShareOptions" class="modal hidden">
   <div class="modal-card">
+    <button class="modal-close-x" data-close="btnCancelShareOptions" aria-label="Cerrar">✕</button>
     <h3>Compartir / Exportar</h3>
     <p class="hint">Elige qué quieres generar:</p>
     <button id="btnGeneratePdf" class="share-option-btn">
@@ -313,7 +319,7 @@
       </span>
     </button>
     <button id="btnGenerateCsv" class="share-option-btn">
-      <span class="share-option-icon">📊</span>
+      <span class="share-option-icon">📋</span>
       <span class="share-option-text">
         <strong>Lista en CSV</strong>
         <small>Para que otra persona con esta app lo importe directo en Importar → Excel/CSV</small>
