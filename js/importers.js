@@ -68,10 +68,14 @@ const Importers = {
   },
 
   // ---------- OCR (foto/escaneo) ----------
-  async parseImage(file, onProgress) {
+  // multiPass=true prueba dos modos de segmentación de página y se queda con el que
+  // reconozca más texto útil. Es más lento (corre el motor dos veces), así que solo se
+  // usa para invitaciones con diseño gráfico complejo, no para listas de invitados normales.
+  async parseImage(file, onProgress, { multiPass = false } = {}) {
     if (!window.Tesseract) await this._loadScript('vendor/tesseract.min.js', false);
     if (onProgress) onProgress({ status: 'preparing', progress: 0 });
     const resized = await this._downscaleImage(file, 1600);
+    const enhanced = await this._enhanceContrast(resized);
     const worker = await Tesseract.createWorker('spa', 1, {
       workerPath: 'vendor/worker.min.js',
       corePath: 'vendor/tesseract-core-simd-lstm.js',
@@ -81,10 +85,67 @@ const Importers = {
       logger: m => { if (onProgress) onProgress(m); }
     });
     try {
-      const { data } = await worker.recognize(resized);
-      return { rawText: data.text.trim() };
+      if (!multiPass) {
+        const { data } = await worker.recognize(enhanced);
+        return { rawText: data.text.trim() };
+      }
+      // PSM 3 = automático (bueno para listas/párrafos). PSM 6 = bloque uniforme (bueno para
+      // recuadros de info tipo fecha/hora/lugar en diseños gráficos). PSM 11 = texto disperso.
+      // Cada modo suele acertar en cosas distintas (uno agarra bien la hora, otro el lugar),
+      // así que devolvemos TODOS los intentos para combinar los datos campo por campo después.
+      const modes = ['3', '6', '11'];
+      const candidates = [];
+      for (const psm of modes) {
+        await worker.setParameters({ tessedit_pageseg_mode: psm });
+        const { data } = await worker.recognize(enhanced);
+        candidates.push(data.text.trim());
+      }
+      const tokenCount = t => (t.match(/[A-Za-zÁÉÍÓÚÑáéíóúñ0-9]{2,}/g) || []).length;
+      const best = candidates.reduce((a, b) => (tokenCount(b) > tokenCount(a) ? b : a), candidates[0] || '');
+      return { rawText: best, candidates };
     } finally {
       await worker.terminate();
+    }
+  },
+
+  // Convierte a escala de grises y estira el contraste (recorte de percentiles 1-99 para
+  // no dejar que un pixel muy claro/oscuro arruine el ajuste). Esto ayuda mucho a Tesseract
+  // cuando el texto está sobre fotos con iluminación despareja o fondos de color variado.
+  async _enhanceContrast(blob) {
+    try {
+      const bitmap = await createImageBitmap(blob);
+      const canvas = document.createElement('canvas');
+      canvas.width = bitmap.width; canvas.height = bitmap.height;
+      const ctx = canvas.getContext('2d', { willReadFrequently: true });
+      ctx.drawImage(bitmap, 0, 0);
+      bitmap.close();
+      const imgData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+      const d = imgData.data;
+      const n = d.length / 4;
+      const gray = new Uint8ClampedArray(n);
+      const hist = new Uint32Array(256);
+      for (let i = 0; i < n; i++) {
+        const g = (0.299 * d[i * 4] + 0.587 * d[i * 4 + 1] + 0.114 * d[i * 4 + 2]) | 0;
+        gray[i] = g;
+        hist[g]++;
+      }
+      const clip = n * 0.01;
+      let lo = 0, acc = 0;
+      while (lo < 255 && acc < clip) { acc += hist[lo]; lo++; }
+      let hi = 255; acc = 0;
+      while (hi > 0 && acc < clip) { acc += hist[hi]; hi--; }
+      const range = Math.max(1, hi - lo);
+      for (let i = 0; i < n; i++) {
+        let v = ((gray[i] - lo) * 255) / range;
+        v = v < 0 ? 0 : v > 255 ? 255 : v;
+        d[i * 4] = d[i * 4 + 1] = d[i * 4 + 2] = v;
+      }
+      ctx.putImageData(imgData, 0, 0);
+      const out = await new Promise(res => canvas.toBlob(res, 'image/png'));
+      return out || blob;
+    } catch (e) {
+      console.warn('No se pudo mejorar el contraste, usando la imagen tal cual:', e);
+      return blob;
     }
   },
 
@@ -247,14 +308,19 @@ const Importers = {
 
     // --- Lugar ---
     let lugar = '';
-    const lugarLabel = lines.find(l => /^(lugar|direcci[oó]n|ubicaci[oó]n)\s*[:\-]/i.test(l));
-    if (lugarLabel) {
-      lugar = lugarLabel.replace(/^(lugar|direcci[oó]n|ubicaci[oó]n)\s*[:\-]\s*/i, '').trim();
-    } else {
-      const kwRegex = /sal[oó]n|club|hotel|restaurante|jard[ií]n|iglesia|parroquia|quinta|villa|plaza|terraza|centro de eventos|hall/i;
+    const lugarIdx = lines.findIndex(l => /lugar|direcci[oó]n|ubicaci[oó]n/i.test(l));
+    if (lugarIdx > -1) {
+      const after = lines[lugarIdx].replace(/^.*?(lugar|direcci[oó]n|ubicaci[oó]n)\s*[:\-]?\s*/i, '').trim();
+      if (after.replace(/\W/g, '').length >= 3) lugar = after;
+      else if (lines[lugarIdx + 1]) lugar = lines[lugarIdx + 1];
+    }
+    if (!lugar) {
+      const kwRegex = /sal[oó]n|club|hotel|restaurante|jard[ií]n|iglesia|parroquia|quinta|villa|plaza|terraza|centro de eventos|hall|playa/i;
       const kwLine = lines.find(l => kwRegex.test(l));
       if (kwLine) lugar = kwLine;
     }
+    // Filtro de calidad: un resultado de 1-2 letras sueltas (ruido de OCR) no cuenta como lugar real.
+    if (lugar.replace(/\W/g, '').length < 4) lugar = '';
 
     // --- Nombre del evento (mejor esfuerzo: primera línea con contenido real) ---
     let nombre = '';

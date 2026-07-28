@@ -1,5 +1,5 @@
 // sw.js — Cachea todo lo necesario para que la app funcione 100% offline tras la primera visita.
-const CACHE_VERSION = 'eventos-v13';
+const CACHE_VERSION = 'eventos-v14';
 const ASSETS = [
   './',
   './index.html',

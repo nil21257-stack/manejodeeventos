@@ -958,14 +958,31 @@
     $('#invitationDetected').classList.add('hidden');
     try {
       const blob = await (await fetch(dataUrl)).blob();
-      const { rawText } = await Importers.parseImage(blob, m => {
-        if (m.status === 'recognizing text') {
-          statusEl.textContent = `Leyendo texto… ${Math.round((m.progress || 0) * 100)}%`;
-        }
-      });
+      const withTimeout = (promise, ms) => Promise.race([
+        promise,
+        new Promise((_, rej) => setTimeout(() => rej(new Error('timeout')), ms))
+      ]);
+      const result = await withTimeout(
+        Importers.parseImage(blob, m => {
+          if (m.status === 'recognizing text') {
+            statusEl.textContent = `Leyendo texto… ${Math.round((m.progress || 0) * 100)}%`;
+          }
+        }, { multiPass: true }),
+        100000
+      );
+      const rawText = result.rawText;
       statusEl.classList.add('hidden');
       if (!rawText.trim()) { toast('No se detectó texto en la imagen'); return; }
-      const found = Importers.parseInvitation(rawText);
+      // Combina lo detectado en cada intento (un modo puede acertar la hora, otro el lugar)
+      const attempts = (result.candidates && result.candidates.length) ? result.candidates : [rawText];
+      const found = { nombre: '', fecha: '', hora: '', lugar: '' };
+      attempts.forEach(t => {
+        const f = Importers.parseInvitation(t);
+        if (!found.nombre && f.nombre) found.nombre = f.nombre;
+        if (!found.fecha && f.fecha) found.fecha = f.fecha;
+        if (!found.hora && f.hora) found.hora = f.hora;
+        if (!found.lugar && f.lugar) found.lugar = f.lugar;
+      });
       $('#detNombre').value = found.nombre || '';
       $('#detFecha').value = found.fecha || '';
       $('#detHora').value = found.hora || '';
