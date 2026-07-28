@@ -1018,6 +1018,23 @@
     toast('Datos aplicados — recuerda tocar "Guardar" para confirmarlos');
   });
 
+  // ---------------- Edición rápida del evento (tocando el encabezado) ----------------
+  $('#btnQuickEventInfo').addEventListener('click', () => {
+    $('#quickEventName').value = DB.event.name || '';
+    $('#quickEventDate').value = DB.event.date || '';
+    $('#quickEventHora').value = DB.event.hora || '';
+    $('#quickEventLugar').value = DB.event.lugar || '';
+    $('#modalQuickEvent').classList.remove('hidden');
+    setTimeout(() => $('#quickEventName').focus(), 50);
+  });
+  $('#btnCancelQuickEvent').addEventListener('click', () => $('#modalQuickEvent').classList.add('hidden'));
+  $('#btnSaveQuickEvent').addEventListener('click', () => {
+    DB.saveEvent($('#quickEventName').value, $('#quickEventDate').value, $('#quickEventLugar').value, $('#quickEventHora').value);
+    $('#modalQuickEvent').classList.add('hidden');
+    renderHeader();
+    toast('Datos del evento actualizados');
+  });
+
   // ---------------- Botones X de cerrar modal ----------------
   $$('.modal-close-x, .modal-close-x-inline').forEach(btn => {
     btn.addEventListener('click', () => {

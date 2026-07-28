@@ -22,10 +22,10 @@
       <circle cx="75" cy="66" r="5" fill="currentColor"/><circle cx="50" cy="81" r="5" fill="currentColor"/>
       <circle cx="25" cy="66" r="5" fill="currentColor"/><circle cx="25" cy="34" r="5" fill="currentColor"/>
     </svg>
-    <div>
+    <button id="btnQuickEventInfo" class="brand-text-btn">
       <h1 id="eventTitle">Mi evento</h1>
       <p id="eventSubtitle" class="subtitle">Sin fecha definida</p>
-    </div>
+    </button>
   </div>
   <div class="header-actions">
     <button id="btnReception" class="icon-btn" aria-label="Modo recepción" title="Modo recepción">✅</button>
@@ -304,6 +304,25 @@
 </div>
 
 <div id="toast" class="toast hidden"></div>
+
+<!-- Modal: edición rápida del nombre/fecha/hora/lugar (al tocar el encabezado) -->
+<div id="modalQuickEvent" class="modal hidden">
+  <div class="modal-card">
+    <button class="modal-close-x" data-close="btnCancelQuickEvent" aria-label="Cerrar">✕</button>
+    <h3>Datos del evento</h3>
+    <label>Nombre del evento<input id="quickEventName" type="text" placeholder="Ej: Boda de Ana y Luis"></label>
+    <div class="field-row">
+      <label>Fecha<input id="quickEventDate" type="date"></label>
+      <label>Hora<input id="quickEventHora" type="time"></label>
+    </div>
+    <label>Lugar (opcional)<input id="quickEventLugar" type="text" placeholder="Ej: Salón Las Palmas, Santiago"></label>
+    <div class="modal-actions">
+      <div class="spacer"></div>
+      <button id="btnCancelQuickEvent" class="btn-ghost">Cancelar</button>
+      <button id="btnSaveQuickEvent" class="btn-primary">Guardar</button>
+    </div>
+  </div>
+</div>
 
 <!-- Modal: elegir formato para compartir/exportar -->
 <div id="modalShareOptions" class="modal hidden">
