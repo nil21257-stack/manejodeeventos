@@ -44,7 +44,8 @@ const Importers = {
     const correoCol = headerCandidates.findIndex(c => /correo|email|e-mail|mail/.test(c));
     const telCol = headerCandidates.findIndex(c => /whatsapp|tel[eé]fono|celular|phone/.test(c));
     const ocupCol = headerCandidates.findIndex(c => /ocupaci[oó]n|instituci[oó]n|profesi[oó]n|empresa/.test(c));
-    const acompCol = headerCandidates.findIndex(c => /acompa[ñn]ante|acompanante|invitado adicional|plus one/.test(c));
+    const acompCol = headerCandidates.findIndex(c => /(?:^|\s)acompa[ñn]ante(?!\s*de\b)|invitado adicional|plus one/.test(c));
+    const esAcompananteDeCol = headerCandidates.findIndex(c => /acompa[ñn]ante\s+de\b/.test(c));
     const tituloCol = headerCandidates.findIndex(c => /^t[ií]tulo/.test(c));
     const confirmadoCol = headerCandidates.findIndex(c => /confirmad|rsvp/.test(c));
     const llegoCol = headerCandidates.findIndex(c => /lleg[oó]/.test(c));
@@ -78,6 +79,7 @@ const Importers = {
       if (telCol > -1) row.telefono = String(r[telCol] ?? '').trim();
       if (ocupCol > -1) row.ocupacion = String(r[ocupCol] ?? '').trim();
       if (acompCol > -1) row.acompanante = normSiNo(r[acompCol]);
+      if (esAcompananteDeCol > -1) row.esAcompananteDe = String(r[esAcompananteDeCol] ?? '').trim();
       if (confirmadoCol > -1) row.confirmado = normSiNo(r[confirmadoCol]);
       if (llegoCol > -1) row.llego = /^(s[ií]|yes|x|1|true)/i.test(String(r[llegoCol] || '').trim());
       if (notaCol > -1) row.nota = String(r[notaCol] ?? '').trim();

@@ -540,11 +540,14 @@
       return /[",\n]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s;
     };
     const siNoTexto = v => v === 'si' ? 'Sí' : v === 'no' ? 'No' : '';
-    const rows = [['Nombre', 'Título', 'Mesa', 'Correo', 'WhatsApp', 'Ocupación', 'Acompañante', 'Confirmado', 'Llegó', 'Nota']];
-    DB.guests.forEach(g => rows.push([
-      g.nombre, g.titulo || '', g.mesa || '', g.correo || '', g.telefono || '',
-      g.ocupacion || '', siNoTexto(g.acompanante), siNoTexto(g.confirmado), g.llego ? 'Sí' : 'No', g.nota || ''
-    ]));
+    const rows = [['Nombre', 'Título', 'Mesa', 'Correo', 'WhatsApp', 'Ocupación', 'Acompañante', 'Es acompañante de', 'Confirmado', 'Llegó', 'Nota']];
+    DB.guests.forEach(g => {
+      const parentName = g.companionOf ? (DB.guests.find(x => x.id === g.companionOf)?.nombre || '') : '';
+      rows.push([
+        g.nombre, g.titulo || '', g.mesa || '', g.correo || '', g.telefono || '',
+        g.ocupacion || '', siNoTexto(g.acompanante), parentName, siNoTexto(g.confirmado), g.llego ? 'Sí' : 'No', g.nota || ''
+      ]);
+    });
     const csv = rows.map(r => r.map(csvEscape).join(',')).join('\r\n');
     const blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8' });
     const ev = DB.event;

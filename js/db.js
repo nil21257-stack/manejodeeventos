@@ -402,13 +402,40 @@ const DB = {
       this._data.guests = [];
       this._data.tables = [];
     }
-    rows.forEach(r => {
+    // Primero se crean los invitados "principales" (los que no vienen marcados como
+    // acompañante de alguien más).
+    const mainRows = rows.filter(r => !r.esAcompananteDe);
+    const companionRows = rows.filter(r => r.esAcompananteDe);
+    const created = [];
+    mainRows.forEach(r => {
       if (!r.nombre) return;
       const g = this.addGuest(r.nombre, r.mesa || '', r.llego || false, r.titulo || '', r.nota || '', r.confirmado || '', {
         correo: r.correo, telefono: r.telefono, ocupacion: r.ocupacion, acompanante: r.acompanante
       });
-      if (r.acompanante === 'si') this.ensureCompanion(g.id);
+      created.push({ row: r, guest: g });
     });
+
+    // Luego, las filas marcadas explícitamente como "acompañante de X" se VINCULAN a ese
+    // invitado en vez de crear uno nuevo por su cuenta — evita el duplicado al reimportar
+    // un CSV exportado desde esta misma app.
+    companionRows.forEach(r => {
+      if (!r.nombre) return;
+      const parentNameNorm = normalizeName(r.esAcompananteDe);
+      let parent = created.find(x => normalizeName(x.guest.nombre) === parentNameNorm && !x.guest.companionId)?.guest;
+      if (!parent) parent = this.guests.find(g => normalizeName(g.nombre) === parentNameNorm && !g.companionOf && !g.companionId);
+      const g = this.addGuest(r.nombre, (parent ? parent.mesa : r.mesa) || '', r.llego || false, r.titulo || '', r.nota || '', r.confirmado || '', {
+        correo: r.correo, telefono: r.telefono, ocupacion: r.ocupacion, companionOf: parent ? parent.id : null
+      });
+      if (parent) parent.companionId = g.id;
+    });
+
+    // Si algún principal dice "trae acompañante: sí" pero no vino su fila vinculada
+    // explícitamente (ej. viene directo de un Google Form sin esa columna), se genera
+    // automático como respaldo — el comportamiento de siempre.
+    created.forEach(({ row, guest }) => {
+      if (row.acompanante === 'si' && !guest.companionId) this.ensureCompanion(guest.id);
+    });
+
     this.save();
   },
 
