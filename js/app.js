@@ -5,6 +5,18 @@
   const $ = sel => document.querySelector(sel);
   const $$ = sel => Array.from(document.querySelectorAll(sel));
 
+  // Números de RD (y todo el plan NANP: +1) casi siempre se escriben en el Form como
+  // 10 dígitos sin el código de país (ej. "809-601-8142"). WhatsApp necesita el número
+  // completo para encontrar el chat, así que si detectamos exactamente 10 dígitos,
+  // asumimos que falta el "1" y se lo agregamos. Si ya viene con código de país
+  // (11 dígitos empezando en 1, o más largo para otros países), se deja tal cual.
+  function normalizePhoneForWhatsapp(telefono) {
+    let digits = (telefono || '').replace(/\D/g, '');
+    if (!digits) return '';
+    if (digits.length === 10) digits = '1' + digits;
+    return digits;
+  }
+
   // Paleta de tonos joya dentro del mismo esquema esmeralda/oro/vino de la app —
   // le da variedad a los avatares sin romper la identidad visual.
   const AVATAR_PALETTE = ['#164C4A', '#4A2E4F', '#5C4A2E', '#2E3B5C', '#5C2E3B', '#2E5C46'];
@@ -92,7 +104,7 @@
       wa.title = 'Abrir WhatsApp';
       wa.addEventListener('click', ev => {
         ev.stopPropagation();
-        window.open('https://wa.me/' + g.telefono.replace(/\D/g, ''), '_blank');
+        window.open('https://wa.me/' + normalizePhoneForWhatsapp(g.telefono), '_blank');
       });
       badgesEl.appendChild(wa);
     }
@@ -260,7 +272,7 @@
     toast('Guardado');
   });
   $('#btnOpenWhatsapp').addEventListener('click', () => {
-    const digits = $('#guestTelefonoInput').value.replace(/\D/g, '');
+    const digits = normalizePhoneForWhatsapp($('#guestTelefonoInput').value);
     if (!digits) { toast('Escribe un número primero'); return; }
     window.open('https://wa.me/' + digits, '_blank');
   });
@@ -659,13 +671,14 @@
     $('#settingsEventDate').value = DB.event.date || '';
     $('#settingsEventHora').value = DB.event.hora || '';
     $('#settingsEventLugar').value = DB.event.lugar || '';
+    $('#settingsSheetsUrl').value = DB.event.sheetsUrl || '';
     renderInvitationBox();
     renderEventsList();
     $('#modalSettings').classList.remove('hidden');
   });
   $('#btnCancelSettings').addEventListener('click', () => $('#modalSettings').classList.add('hidden'));
   $('#btnSaveSettings').addEventListener('click', () => {
-    DB.saveEvent($('#settingsEventName').value, $('#settingsEventDate').value, $('#settingsEventLugar').value, $('#settingsEventHora').value);
+    DB.saveEvent($('#settingsEventName').value, $('#settingsEventDate').value, $('#settingsEventLugar').value, $('#settingsEventHora').value, $('#settingsSheetsUrl').value.trim());
     $('#modalSettings').classList.add('hidden');
     renderHeader();
     toast('Ajustes guardados');
@@ -720,6 +733,7 @@
         $('#importReview').classList.remove('hidden');
         setTimeout(() => $('#rawTextArea').focus(), 50);
       }
+      else if (mode === 'sheets') syncFromSheets();
     });
   });
 
@@ -751,6 +765,30 @@
       setStatus('No se pudo leer el archivo. Verifica que sea un Excel o CSV válido.', true);
     }
   });
+
+  async function syncFromSheets() {
+    const url = DB.event.sheetsUrl;
+    if (!url) {
+      if (confirm('Todavía no has configurado el link de Google Sheets para este evento. ¿Ir a Ajustes para agregarlo?')) {
+        $('#btnSettings').click();
+      }
+      return;
+    }
+    if (!navigator.onLine) {
+      setStatus('Sin conexión a internet — esta función necesita internet para traer los datos más recientes de Google Sheets.', true);
+      return;
+    }
+    setStatus('Sincronizando con Google Sheets…');
+    try {
+      const { rows } = await Importers.parseSheetsUrl(url);
+      if (!rows.length) { setStatus('La hoja no tiene filas con nombres, o no se reconoció ninguna columna de nombre.', true); return; }
+      showPreview(rows);
+      $('#importStatus').classList.add('hidden');
+    } catch (err) {
+      console.error(err);
+      setStatus(err.message || 'No se pudo sincronizar con Google Sheets.', true);
+    }
+  }
 
   $('#filePdf').addEventListener('change', async e => {
     const file = e.target.files[0];

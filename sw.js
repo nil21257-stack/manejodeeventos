@@ -1,5 +1,5 @@
 // sw.js — Cachea todo lo necesario para que la app funcione 100% offline tras la primera visita.
-const CACHE_VERSION = 'eventos-v19';
+const CACHE_VERSION = 'eventos-v20';
 const ASSETS = [
   './',
   './index.html',
@@ -41,6 +41,9 @@ self.addEventListener('activate', event => {
 // Cache-first para todo lo propio de la app; cualquier recurso nuevo se guarda al vuelo.
 self.addEventListener('fetch', event => {
   if (event.request.method !== 'GET') return;
+  // Peticiones a otros dominios (ej. sincronizar con Google Sheets) se dejan pasar
+  // directo a la red, sin pasar por la lógica de caché de la app.
+  if (!event.request.url.startsWith(self.location.origin)) return;
   event.respondWith(
     caches.match(event.request).then(cached => {
       if (cached) return cached;

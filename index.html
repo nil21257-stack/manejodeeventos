@@ -112,6 +112,11 @@
         <span>Pegar texto</span>
         <small>manual</small>
       </button>
+      <button class="import-card" data-mode="sheets">
+        <span class="import-icon">🔄</span>
+        <span>Google Sheets</span>
+        <small>sincronizar</small>
+      </button>
     </div>
 
     <input type="file" id="fileExcel" accept=".xlsx,.xls,.csv" class="hidden">
@@ -276,6 +281,13 @@
       <label>Hora<input id="settingsEventHora" type="time"></label>
     </div>
     <label>Lugar (opcional)<input id="settingsEventLugar" type="text" placeholder="Ej: Salón Las Palmas, Santiago"></label>
+
+    <label>Link de Google Sheets (opcional)
+      <input id="settingsSheetsUrl" type="url" placeholder="https://docs.google.com/spreadsheets/d/e/.../pub?output=csv">
+    </label>
+    <p class="hint">Para traer invitados directo desde las respuestas de un Google Form. En tu hoja de
+      respuestas: <strong>Archivo → Compartir → Publicar en la web</strong> → elige esa hoja → formato
+      <strong>CSV</strong> → Publicar, y pega aquí el link que te da.</p>
 
     <label>Invitación del evento (opcional)</label>
     <p class="hint">Sube una foto de la invitación. La app intenta leer el nombre, la fecha, la hora y el lugar automáticamente para que solo confirmes o corrijas.</p>

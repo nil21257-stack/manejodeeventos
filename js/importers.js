@@ -5,8 +5,20 @@ const Importers = {
 
   // ---------- EXCEL / CSV ----------
   async parseExcel(file) {
-    const buf = await file.arrayBuffer();
-    const wb = XLSX.read(buf, { type: 'array' });
+    // Los .csv son texto plano: hay que decodificarlos como UTF-8 explícitamente,
+    // porque si se le pasan como bytes binarios "en bruto" (type:'array'), SheetJS
+    // puede malinterpretar acentos/ñ (ej. "Ocupación" se corrompe), lo que rompe la
+    // detección de columnas. Los .xlsx/.xls sí son binarios reales y deben leerse tal cual.
+    const isCsv = (file.name && /\.csv$/i.test(file.name)) || /csv|text\/plain/i.test(file.type || '');
+    let wb;
+    if (isCsv) {
+      const buf = await file.arrayBuffer();
+      const text = new TextDecoder('utf-8').decode(buf);
+      wb = XLSX.read(text, { type: 'string' });
+    } else {
+      const buf = await file.arrayBuffer();
+      wb = XLSX.read(buf, { type: 'array' });
+    }
     const sheet = wb.Sheets[wb.SheetNames[0]];
     const rows = XLSX.utils.sheet_to_json(sheet, { header: 1, defval: '' });
     if (!rows.length) return { rows: [], rawText: '' };
@@ -51,6 +63,23 @@ const Importers = {
 
     const rawText = out.map(r => r.mesa ? `${r.nombre}, ${r.mesa}` : r.nombre).join('\n');
     return { rows: out, rawText };
+  },
+
+  // ---------- Google Sheets (link publicado como CSV) ----------
+  async parseSheetsUrl(url) {
+    let res;
+    try {
+      res = await fetch(url);
+    } catch (e) {
+      throw new Error('No se pudo conectar. Verifica tu conexión a internet.');
+    }
+    if (!res.ok) throw new Error(`Google respondió con un error (${res.status}). Revisa que el link esté publicado correctamente.`);
+    const text = await res.text();
+    if (/<html/i.test(text.slice(0, 200))) {
+      throw new Error('El link no parece ser un CSV publicado. Revisa los pasos de "Publicar en la web" en Google Sheets.');
+    }
+    const blob = new Blob([text], { type: 'text/csv' });
+    return this.parseExcel(blob);
   },
 
   // ---------- PDF ----------
