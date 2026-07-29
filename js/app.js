@@ -209,6 +209,7 @@
       $('#guestTelefonoInput').value = g.telefono || '';
       $('#guestOcupacionInput').value = g.ocupacion || '';
       $('#guestAcompananteInput').value = g.acompanante || '';
+      $('#guestAcompananteLabel').classList.toggle('hidden', !!g.companionOf);
       $('#btnDeleteGuest').classList.remove('hidden');
     } else {
       $('#modalGuestTitle').textContent = 'Nuevo invitado';
@@ -221,6 +222,7 @@
       $('#guestTelefonoInput').value = '';
       $('#guestOcupacionInput').value = '';
       $('#guestAcompananteInput').value = '';
+      $('#guestAcompananteLabel').classList.remove('hidden');
       $('#btnDeleteGuest').classList.add('hidden');
     }
     fillTableSuggestions();
@@ -254,10 +256,13 @@
       acompanante: $('#guestAcompananteInput').value
     };
     if (!nombre) { toast('Escribe el nombre del invitado'); return; }
+    const existingGuest = editingGuestId ? DB.guests.find(x => x.id === editingGuestId) : null;
+    const willCreateCompanion = extra.acompanante === 'si' && !(existingGuest && existingGuest.companionId);
     if (mesa) {
+      const neededSeats = willCreateCompanion ? 2 : 1;
       const avail = DB.tableAvailability(mesa, editingGuestId);
-      if (avail && avail.llena) {
-        toast(`"${mesa}" ya está llena (${avail.ocupados}/${avail.capacidad})`);
+      if (avail && avail.disponibles < neededSeats) {
+        toast(`"${mesa}" no tiene espacio suficiente (necesita ${neededSeats} asientos, quedan ${avail.disponibles})`);
         return;
       }
     }
@@ -265,8 +270,17 @@
     if (dups.length && !confirm(`Ya existe "${dups[0].nombre}"${dups[0].mesa ? ' en ' + dups[0].mesa : ''}. ¿Agregar de todas formas?`)) {
       return;
     }
-    if (editingGuestId) DB.updateGuest(editingGuestId, nombre, mesa, titulo, nota, confirmado, extra);
-    else DB.addGuest(nombre, mesa, false, titulo, nota, confirmado, extra);
+    let savedGuest;
+    if (editingGuestId) { DB.updateGuest(editingGuestId, nombre, mesa, titulo, nota, confirmado, extra); savedGuest = DB.guests.find(x => x.id === editingGuestId); }
+    else { savedGuest = DB.addGuest(nombre, mesa, false, titulo, nota, confirmado, extra); }
+
+    if (extra.acompanante === 'si' && !savedGuest.companionId) {
+      DB.ensureCompanion(savedGuest.id);
+    } else if (extra.acompanante !== 'si' && savedGuest.companionId) {
+      if (confirm('Ya no trae acompañante. ¿Eliminar también la fila de su acompañante?')) {
+        DB.removeCompanion(savedGuest.id);
+      }
+    }
     closeGuestModal();
     renderAll();
     toast('Guardado');

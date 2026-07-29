@@ -149,6 +149,8 @@ const DB = {
       if (g.telefono === undefined) g.telefono = '';
       if (g.ocupacion === undefined) g.ocupacion = '';
       if (g.acompanante === undefined) g.acompanante = ''; // '', 'si', 'no'
+      if (g.companionId === undefined) g.companionId = null; // id del invitado "acompañante" generado automáticamente
+      if (g.companionOf === undefined) g.companionOf = null; // si ESTE invitado ES un acompañante generado, id de a quién acompaña
     });
     this._data.tables.forEach(t => {
       if (t.capacidad === undefined) t.capacidad = null;
@@ -215,6 +217,27 @@ const DB = {
     this.save();
   },
 
+  // ---------- Acompañante automático ----------
+  // Crea (si no existe ya) un invitado vinculado "Acompañante de X" en la misma mesa.
+  ensureCompanion(guestId) {
+    const g = this.guests.find(x => x.id === guestId);
+    if (!g || g.companionId) return null;
+    const comp = this.addGuest(`Acompañante de ${g.nombre}`, g.mesa, false, '', '', '', { companionOf: g.id });
+    g.companionId = comp.id;
+    this.save();
+    return comp;
+  },
+
+  // Quita al acompañante vinculado (si existe).
+  removeCompanion(guestId) {
+    const g = this.guests.find(x => x.id === guestId);
+    if (!g || !g.companionId) return;
+    const idx = this.load().guests.findIndex(x => x.id === g.companionId);
+    if (idx > -1) this._data.guests.splice(idx, 1);
+    g.companionId = null;
+    this.save();
+  },
+
   addGuest(nombre, mesa, llego, titulo, nota, confirmado, extra) {
     extra = extra || {};
     const g = {
@@ -228,7 +251,9 @@ const DB = {
       correo: (extra.correo || '').trim(),
       telefono: (extra.telefono || '').trim(),
       ocupacion: (extra.ocupacion || '').trim(),
-      acompanante: extra.acompanante || ''
+      acompanante: extra.acompanante || '',
+      companionId: null,
+      companionOf: extra.companionOf || null
     };
     this.load().guests.push(g);
     this._ensureTable(g.mesa);
@@ -251,6 +276,11 @@ const DB = {
       if (extra.acompanante !== undefined) g.acompanante = extra.acompanante || '';
     }
     this._ensureTable(g.mesa);
+    // Si este invitado tiene un acompañante vinculado, lo mueve con él a la misma mesa
+    if (g.companionId) {
+      const comp = this.guests.find(x => x.id === g.companionId);
+      if (comp) comp.mesa = g.mesa;
+    }
     this.save();
   },
 
@@ -263,6 +293,15 @@ const DB = {
   },
 
   deleteGuest(id) {
+    const g = this.guests.find(x => x.id === id);
+    if (g && g.companionId) {
+      const idx = this.load().guests.findIndex(x => x.id === g.companionId);
+      if (idx > -1) this._data.guests.splice(idx, 1);
+    }
+    if (g && g.companionOf) {
+      const parent = this.guests.find(x => x.id === g.companionOf);
+      if (parent) parent.companionId = null;
+    }
     const arr = this.load().guests;
     const i = arr.findIndex(x => x.id === id);
     if (i > -1) arr.splice(i, 1);
@@ -272,6 +311,12 @@ const DB = {
   deleteGuests(ids) {
     const set = new Set(ids);
     this._data.guests = this.load().guests.filter(g => !set.has(g.id));
+    // Limpia referencias de acompañante que hayan quedado huérfanas
+    const existingIds = new Set(this._data.guests.map(g => g.id));
+    this._data.guests.forEach(g => {
+      if (g.companionId && !existingIds.has(g.companionId)) g.companionId = null;
+      if (g.companionOf && !existingIds.has(g.companionOf)) g.companionOf = null;
+    });
     this.save();
   },
 
@@ -359,9 +404,10 @@ const DB = {
     }
     rows.forEach(r => {
       if (!r.nombre) return;
-      this.addGuest(r.nombre, r.mesa || '', false, '', '', '', {
+      const g = this.addGuest(r.nombre, r.mesa || '', false, r.titulo || '', '', '', {
         correo: r.correo, telefono: r.telefono, ocupacion: r.ocupacion, acompanante: r.acompanante
       });
+      if (r.acompanante === 'si') this.ensureCompanion(g.id);
     });
     this.save();
   },

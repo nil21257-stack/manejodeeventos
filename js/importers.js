@@ -3,6 +3,20 @@
 
 const Importers = {
 
+  // Detecta títulos comunes al inicio de un nombre (ej. "Ing. Roberto Feliz" -> título+nombre
+  // separados). Útil porque en un Google Form la gente casi siempre escribe todo junto en el
+  // campo "Nombre", sin una pregunta aparte para el título.
+  extractTitle(nombreRaw) {
+    const m = String(nombreRaw || '').trim().match(
+      /^(sr\.?|sra\.?|srta\.?|dr\.?|dra\.?|ing\.?|lic\.?|licda\.?|arq\.?|prof\.?|profa\.?|mtro\.?|mtra\.?|padre|pastor|rev\.?)\s+(.+)$/i
+    );
+    if (!m) return { titulo: '', nombre: String(nombreRaw || '').trim() };
+    // Normaliza capitalización del título (ej. "ING" -> "Ing.")
+    let titulo = m[1].replace(/\.$/, '');
+    titulo = titulo.charAt(0).toUpperCase() + titulo.slice(1).toLowerCase() + '.';
+    return { titulo, nombre: m[2].trim() };
+  },
+
   // ---------- EXCEL / CSV ----------
   async parseExcel(file) {
     // Los .csv son texto plano: hay que decodificarlos como UTF-8 explícitamente,
@@ -50,10 +64,12 @@ const Importers = {
 
     const out = [];
     dataRows.forEach(r => {
-      const nombre = String(r[nCol] ?? '').trim();
+      const nombreCrudo = String(r[nCol] ?? '').trim();
       const mesa = tCol > -1 ? String(r[tCol] ?? '').trim() : '';
-      if (!nombre) return;
+      if (!nombreCrudo) return;
+      const { titulo, nombre } = this.extractTitle(nombreCrudo);
       const row = { nombre, mesa };
+      if (titulo) row.titulo = titulo;
       if (correoCol > -1) row.correo = String(r[correoCol] ?? '').trim();
       if (telCol > -1) row.telefono = String(r[telCol] ?? '').trim();
       if (ocupCol > -1) row.ocupacion = String(r[ocupCol] ?? '').trim();
