@@ -404,7 +404,7 @@ const DB = {
     }
     rows.forEach(r => {
       if (!r.nombre) return;
-      const g = this.addGuest(r.nombre, r.mesa || '', false, r.titulo || '', '', '', {
+      const g = this.addGuest(r.nombre, r.mesa || '', r.llego || false, r.titulo || '', r.nota || '', r.confirmado || '', {
         correo: r.correo, telefono: r.telefono, ocupacion: r.ocupacion, acompanante: r.acompanante
       });
       if (r.acompanante === 'si') this.ensureCompanion(g.id);

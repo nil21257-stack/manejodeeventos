@@ -127,9 +127,9 @@
   }
 
   function renderGuests() {
-    const q = $('#searchInput').value.trim().toLowerCase();
+    const q = normalizeName($('#searchInput').value.trim());
     let guests = DB.guests
-      .filter(g => !q || g.nombre.toLowerCase().includes(q) || g.mesa.toLowerCase().includes(q));
+      .filter(g => !q || normalizeName(g.nombre).includes(q) || normalizeName(g.mesa).includes(q));
     if (currentFilter === 'llegaron') guests = guests.filter(g => g.llego);
     else if (currentFilter === 'faltan') guests = guests.filter(g => !g.llego);
 
@@ -196,8 +196,8 @@
     renderGuests();
   });
   $('#btnSelectAll').addEventListener('click', () => {
-    const q = $('#searchInput').value.trim().toLowerCase();
-    let guests = DB.guests.filter(g => !q || g.nombre.toLowerCase().includes(q) || g.mesa.toLowerCase().includes(q));
+    const q = normalizeName($('#searchInput').value.trim());
+    let guests = DB.guests.filter(g => !q || normalizeName(g.nombre).includes(q) || normalizeName(g.mesa).includes(q));
     if (currentFilter === 'llegaron') guests = guests.filter(g => g.llego);
     else if (currentFilter === 'faltan') guests = guests.filter(g => !g.llego);
     const allSelected = guests.every(g => selectedIds.has(g.id)) && guests.length > 0;
@@ -375,8 +375,8 @@
     const t = DB.tables.find(x => x.id === tableId);
     if (!t) return;
     const allGuests = DB.guestsInTable(t.name).sort((a, b) => a.nombre.localeCompare(b.nombre, 'es'));
-    const q = $('#detailSearchInput').value.trim().toLowerCase();
-    const guests = q ? allGuests.filter(g => g.nombre.toLowerCase().includes(q)) : allGuests;
+    const q = normalizeName($('#detailSearchInput').value.trim());
+    const guests = q ? allGuests.filter(g => normalizeName(g.nombre).includes(q)) : allGuests;
 
     $('#detailTableName').textContent = t.name;
     const occText = t.capacidad != null
@@ -490,6 +490,20 @@
       doc.text(`${DB.guests.length} invitados · ${tables.length} mesas`, marginX, y); y += 26;
       doc.setTextColor(0);
 
+      function printGuestLine(g, i, x) {
+        ensureSpace(g.correo || g.telefono || g.ocupacion ? 2 : 1);
+        doc.setFont('helvetica', 'normal'); doc.setFontSize(11); doc.setTextColor(0);
+        const prefix = g.companionOf ? '↳ ' : `${i + 1}. `;
+        const label = `${prefix}${g.titulo ? g.titulo + ' ' : ''}${g.nombre}${g.llego ? '  ✓' : ''}${g.acompanante === 'si' ? '  (+1)' : ''}`;
+        doc.text(label, x, y); y += 13;
+        const detailParts = [g.ocupacion, g.telefono, g.correo].filter(Boolean);
+        if (detailParts.length) {
+          doc.setFontSize(9); doc.setTextColor(120);
+          doc.text(detailParts.join('  ·  '), x + 10, y); y += 13;
+          doc.setTextColor(0);
+        }
+      }
+
       tables.forEach(t => {
         const guests = DB.guestsInTable(t.name).sort((a, b) => a.nombre.localeCompare(b.nombre, 'es'));
         ensureSpace(3);
@@ -497,14 +511,8 @@
         doc.setFont('helvetica', 'bold'); doc.setFontSize(13);
         const occ = t.capacidad != null ? ` (${guests.length}/${t.capacidad})` : ` (${guests.length})`;
         doc.text(`${t.name}${t.etiqueta ? ' — ' + t.etiqueta : ''}${occ}`, marginX, y); y += 18;
-        doc.setFont('helvetica', 'normal'); doc.setFontSize(11);
-        if (!guests.length) { doc.setTextColor(140); doc.text('(sin invitados)', marginX + 12, y); doc.setTextColor(0); y += 16; }
-        guests.forEach((g, i) => {
-          ensureSpace(1);
-          const label = `${i + 1}. ${g.titulo ? g.titulo + ' ' : ''}${g.nombre}${g.llego ? '  ✓' : ''}`;
-          doc.text(label, marginX + 12, y);
-          y += 15;
-        });
+        if (!guests.length) { doc.setFont('helvetica', 'normal'); doc.setFontSize(11); doc.setTextColor(140); doc.text('(sin invitados)', marginX + 12, y); doc.setTextColor(0); y += 16; }
+        guests.forEach((g, i) => printGuestLine(g, i, marginX + 12));
         y += 10;
       });
 
@@ -513,12 +521,7 @@
         doc.setDrawColor(210); doc.line(marginX, y, pageW - marginX, y); y += 18;
         doc.setFont('helvetica', 'bold'); doc.setFontSize(13);
         doc.text(`Sin mesa asignada (${sinMesa.length})`, marginX, y); y += 18;
-        doc.setFont('helvetica', 'normal'); doc.setFontSize(11);
-        sinMesa.forEach((g, i) => {
-          ensureSpace(1);
-          doc.text(`${i + 1}. ${g.titulo ? g.titulo + ' ' : ''}${g.nombre}`, marginX + 12, y);
-          y += 15;
-        });
+        sinMesa.forEach((g, i) => printGuestLine(g, i, marginX + 12));
       }
 
       const blob = doc.output('blob');
@@ -536,8 +539,12 @@
       const s = String(v ?? '');
       return /[",\n]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s;
     };
-    const rows = [['Nombre', 'Mesa']];
-    DB.guests.forEach(g => rows.push([g.nombre, g.mesa || '']));
+    const siNoTexto = v => v === 'si' ? 'Sí' : v === 'no' ? 'No' : '';
+    const rows = [['Nombre', 'Título', 'Mesa', 'Correo', 'WhatsApp', 'Ocupación', 'Acompañante', 'Confirmado', 'Llegó', 'Nota']];
+    DB.guests.forEach(g => rows.push([
+      g.nombre, g.titulo || '', g.mesa || '', g.correo || '', g.telefono || '',
+      g.ocupacion || '', siNoTexto(g.acompanante), siNoTexto(g.confirmado), g.llego ? 'Sí' : 'No', g.nota || ''
+    ]));
     const csv = rows.map(r => r.map(csvEscape).join(',')).join('\r\n');
     const blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8' });
     const ev = DB.event;
@@ -994,8 +1001,8 @@
 
   // ---------------- Modo recepción ----------------
   function renderReceptionList() {
-    const q = $('#receptionSearch').value.trim().toLowerCase();
-    const guests = DB.guests.filter(g => !q || g.nombre.toLowerCase().includes(q));
+    const q = normalizeName($('#receptionSearch').value.trim());
+    const guests = DB.guests.filter(g => !q || normalizeName(g.nombre).includes(q));
 
     const mains = guests.filter(g => !g.companionOf).sort((a, b) => a.nombre.localeCompare(b.nombre, 'es'));
     const byId = new Map(guests.map(g => [g.id, g]));

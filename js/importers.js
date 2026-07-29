@@ -45,6 +45,10 @@ const Importers = {
     const telCol = headerCandidates.findIndex(c => /whatsapp|tel[eé]fono|celular|phone/.test(c));
     const ocupCol = headerCandidates.findIndex(c => /ocupaci[oó]n|instituci[oó]n|profesi[oó]n|empresa/.test(c));
     const acompCol = headerCandidates.findIndex(c => /acompa[ñn]ante|acompanante|invitado adicional|plus one/.test(c));
+    const tituloCol = headerCandidates.findIndex(c => /^t[ií]tulo/.test(c));
+    const confirmadoCol = headerCandidates.findIndex(c => /confirmad|rsvp/.test(c));
+    const llegoCol = headerCandidates.findIndex(c => /lleg[oó]/.test(c));
+    const notaCol = headerCandidates.findIndex(c => /^nota|observaci[oó]n/.test(c));
 
     let dataRows = rows;
     let nCol = nameCol, tCol = tableCol;
@@ -67,13 +71,16 @@ const Importers = {
       const nombreCrudo = String(r[nCol] ?? '').trim();
       const mesa = tCol > -1 ? String(r[tCol] ?? '').trim() : '';
       if (!nombreCrudo) return;
-      const { titulo, nombre } = this.extractTitle(nombreCrudo);
+      const { titulo: tituloAuto, nombre } = this.extractTitle(nombreCrudo);
       const row = { nombre, mesa };
-      if (titulo) row.titulo = titulo;
+      row.titulo = tituloCol > -1 ? String(r[tituloCol] ?? '').trim() : tituloAuto;
       if (correoCol > -1) row.correo = String(r[correoCol] ?? '').trim();
       if (telCol > -1) row.telefono = String(r[telCol] ?? '').trim();
       if (ocupCol > -1) row.ocupacion = String(r[ocupCol] ?? '').trim();
       if (acompCol > -1) row.acompanante = normSiNo(r[acompCol]);
+      if (confirmadoCol > -1) row.confirmado = normSiNo(r[confirmadoCol]);
+      if (llegoCol > -1) row.llego = /^(s[ií]|yes|x|1|true)/i.test(String(r[llegoCol] || '').trim());
+      if (notaCol > -1) row.nota = String(r[notaCol] ?? '').trim();
       out.push(row);
     });
 
