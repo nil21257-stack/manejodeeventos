@@ -197,6 +197,16 @@ main{max-width:640px;margin:0 auto;padding:16px 16px 24px;}
   transition:transform .08s;
 }
 .guest-row:active{transform:scale(.985);}
+
+.guest-row.companion-row{
+  margin-left:26px;margin-top:-3px;width:calc(100% - 26px);
+  opacity:.82;
+  border-left:3px solid rgba(201,161,90,.35);
+  padding-left:11px;padding-top:9px;padding-bottom:9px;
+  background:var(--ink-2);
+  box-shadow:0 2px 5px rgba(0,0,0,.18);
+}
+.guest-row.companion-row .guest-name{font-size:14px;}
 .guest-avatar{
   width:36px;height:36px;border-radius:50%;background:var(--emerald-2);color:var(--gold-soft);
   display:flex;align-items:center;justify-content:center;font-weight:600;font-size:14px;flex-shrink:0;

@@ -58,9 +58,16 @@
   let selectionMode = false;
   let selectedIds = new Set();
 
+  function isAutoCompanionName(g) {
+    if (!g.companionOf) return false;
+    const parent = DB.guests.find(x => x.id === g.companionOf);
+    return parent && g.nombre === `Acompañante de ${parent.nombre}`;
+  }
+
   function buildGuestRow(g, onCheckinToggle) {
     const li = document.createElement('li');
-    li.className = 'guest-row' + (g.llego ? ' arrived' : '') + (selectionMode ? ' selectable' : '');
+    const isCompanion = !!g.companionOf;
+    li.className = 'guest-row' + (g.llego ? ' arrived' : '') + (selectionMode ? ' selectable' : '') + (isCompanion ? ' companion-row' : '');
 
     if (selectionMode) {
       const checked = selectedIds.has(g.id);
@@ -70,7 +77,7 @@
           <div class="guest-name"></div>
           <div class="guest-table ${g.mesa ? '' : 'unassigned'}"></div>
         </div>`;
-      li.querySelector('.guest-name').textContent = g.titulo ? `${g.titulo} ${g.nombre}` : g.nombre;
+      li.querySelector('.guest-name').textContent = (isCompanion ? '↳ ' : '') + (isAutoCompanionName(g) ? 'Acompañante' : (g.titulo ? `${g.titulo} ${g.nombre}` : g.nombre));
       li.querySelector('.guest-table').textContent = (g.mesa || 'Sin mesa asignada') + (g.nota ? ' 📝' : '');
       li.addEventListener('click', () => {
         if (selectedIds.has(g.id)) selectedIds.delete(g.id); else selectedIds.add(g.id);
@@ -87,7 +94,7 @@
         <div class="guest-badges"></div>
       </div>
       <span class="chevron">›</span>`;
-    li.querySelector('.guest-name').textContent = g.titulo ? `${g.titulo} ${g.nombre}` : g.nombre;
+    li.querySelector('.guest-name').textContent = (isCompanion ? '↳ ' : '') + (isAutoCompanionName(g) ? 'Acompañante' : (g.titulo ? `${g.titulo} ${g.nombre}` : g.nombre));
     li.querySelector('.guest-table').textContent = (g.mesa || 'Sin mesa asignada') + (g.nota ? ' 📝' : '');
     if (g.nota) li.querySelector('.guest-table').title = g.nota;
     const badgesEl = li.querySelector('.guest-badges');
@@ -125,21 +132,38 @@
       .filter(g => !q || g.nombre.toLowerCase().includes(q) || g.mesa.toLowerCase().includes(q));
     if (currentFilter === 'llegaron') guests = guests.filter(g => g.llego);
     else if (currentFilter === 'faltan') guests = guests.filter(g => !g.llego);
-    guests = guests.sort((a, b) => a.nombre.localeCompare(b.nombre, 'es'));
+
+    // Agrupa: cada invitado principal, seguido inmediatamente de su acompañante (si pasó el filtro).
+    const mains = guests.filter(g => !g.companionOf).sort((a, b) => a.nombre.localeCompare(b.nombre, 'es'));
+    const byId = new Map(guests.map(g => [g.id, g]));
+    const usedCompanionIds = new Set();
+    const ordered = [];
+    mains.forEach(g => {
+      ordered.push(g);
+      if (g.companionId && byId.has(g.companionId)) {
+        ordered.push(byId.get(g.companionId));
+        usedCompanionIds.add(g.companionId);
+      }
+    });
+    // Acompañantes cuyo principal no pasó el filtro (caso raro): se muestran igual, al final.
+    guests.filter(g => g.companionOf && !usedCompanionIds.has(g.id)).forEach(g => ordered.push(g));
 
     const list = $('#guestList');
     list.innerHTML = '';
-    guests.forEach(g => list.appendChild(buildGuestRow(g)));
+    ordered.forEach(g => list.appendChild(buildGuestRow(g)));
 
     $('#emptyGuests').classList.toggle('hidden', DB.guests.length > 0);
     list.classList.toggle('hidden', DB.guests.length === 0);
 
     const total = DB.guests.length;
+    const mainCount = DB.guests.filter(g => !g.companionOf).length;
+    const companionCount = total - mainCount;
     const mesas = new Set(DB.guests.filter(g => g.mesa).map(g => g.mesa.toLowerCase())).size;
     const sinMesa = DB.guests.filter(g => !g.mesa).length;
     const llegaron = DB.guests.filter(g => g.llego).length;
     const confirmados = DB.guests.filter(g => g.confirmado === 'si').length;
     $('#statTotal').textContent = total;
+    $('#statTotalLabel').textContent = companionCount > 0 ? `${mainCount} + ${companionCount} acomp.` : 'invitados';
     $('#statMesas').textContent = mesas;
     $('#statSinMesa').textContent = sinMesa;
     $('#statLlegaron').textContent = llegaron;
@@ -971,21 +995,34 @@
   // ---------------- Modo recepción ----------------
   function renderReceptionList() {
     const q = $('#receptionSearch').value.trim().toLowerCase();
-    const guests = DB.guests
-      .filter(g => !q || g.nombre.toLowerCase().includes(q))
-      .sort((a, b) => a.nombre.localeCompare(b.nombre, 'es'));
+    const guests = DB.guests.filter(g => !q || g.nombre.toLowerCase().includes(q));
+
+    const mains = guests.filter(g => !g.companionOf).sort((a, b) => a.nombre.localeCompare(b.nombre, 'es'));
+    const byId = new Map(guests.map(g => [g.id, g]));
+    const usedCompanionIds = new Set();
+    const ordered = [];
+    mains.forEach(g => {
+      ordered.push(g);
+      if (g.companionId && byId.has(g.companionId)) {
+        ordered.push(byId.get(g.companionId));
+        usedCompanionIds.add(g.companionId);
+      }
+    });
+    guests.filter(g => g.companionOf && !usedCompanionIds.has(g.id)).forEach(g => ordered.push(g));
+
     const list = $('#receptionList');
     list.innerHTML = '';
-    guests.forEach(g => {
+    ordered.forEach(g => {
+      const isCompanion = !!g.companionOf;
       const li = document.createElement('li');
-      li.className = 'guest-row' + (g.llego ? ' arrived' : '');
+      li.className = 'guest-row' + (g.llego ? ' arrived' : '') + (isCompanion ? ' companion-row' : '');
       li.innerHTML = `
         <div class="guest-avatar ${g.llego ? 'checked' : ''}">${g.llego ? '✓' : (initials(g.nombre) || '?')}</div>
         <div class="guest-info">
           <div class="guest-name"></div>
           <div class="guest-table ${g.mesa ? '' : 'unassigned'}"></div>
         </div>`;
-      li.querySelector('.guest-name').textContent = g.titulo ? `${g.titulo} ${g.nombre}` : g.nombre;
+      li.querySelector('.guest-name').textContent = (isCompanion ? '↳ ' : '') + (isAutoCompanionName(g) ? 'Acompañante' : (g.titulo ? `${g.titulo} ${g.nombre}` : g.nombre));
       li.querySelector('.guest-table').textContent = g.mesa || 'Sin mesa asignada';
       if (!g.llego) li.querySelector('.guest-avatar').style.background = avatarColor(g.nombre);
       li.addEventListener('click', () => {
