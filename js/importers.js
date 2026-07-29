@@ -15,6 +15,10 @@ const Importers = {
     const headerCandidates = rows[0].map(c => String(c).toLowerCase().trim());
     const nameCol = headerCandidates.findIndex(c => /nombre|invitad|guest|name/.test(c));
     const tableCol = headerCandidates.findIndex(c => /mesa|tabla|table/.test(c));
+    const correoCol = headerCandidates.findIndex(c => /correo|email|e-mail|mail/.test(c));
+    const telCol = headerCandidates.findIndex(c => /whatsapp|tel[eé]fono|celular|phone/.test(c));
+    const ocupCol = headerCandidates.findIndex(c => /ocupaci[oó]n|instituci[oó]n|profesi[oó]n|empresa/.test(c));
+    const acompCol = headerCandidates.findIndex(c => /acompa[ñn]ante|acompanante|invitado adicional|plus one/.test(c));
 
     let dataRows = rows;
     let nCol = nameCol, tCol = tableCol;
@@ -25,11 +29,24 @@ const Importers = {
       nCol = 0; tCol = 1;
     }
 
+    const normSiNo = v => {
+      const s = String(v || '').trim().toLowerCase();
+      if (/^(s[ií]|yes|x|1|true)/.test(s)) return 'si';
+      if (/^(no|0|false)/.test(s)) return 'no';
+      return '';
+    };
+
     const out = [];
     dataRows.forEach(r => {
       const nombre = String(r[nCol] ?? '').trim();
       const mesa = tCol > -1 ? String(r[tCol] ?? '').trim() : '';
-      if (nombre) out.push({ nombre, mesa });
+      if (!nombre) return;
+      const row = { nombre, mesa };
+      if (correoCol > -1) row.correo = String(r[correoCol] ?? '').trim();
+      if (telCol > -1) row.telefono = String(r[telCol] ?? '').trim();
+      if (ocupCol > -1) row.ocupacion = String(r[ocupCol] ?? '').trim();
+      if (acompCol > -1) row.acompanante = normSiNo(r[acompCol]);
+      out.push(row);
     });
 
     const rawText = out.map(r => r.mesa ? `${r.nombre}, ${r.mesa}` : r.nombre).join('\n');

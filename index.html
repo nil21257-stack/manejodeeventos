@@ -171,6 +171,26 @@
     </datalist>
     <label>Mesa<input id="guestTableInput" type="text" placeholder="Ej: Mesa 3, Familia López…" list="tableSuggestions"></label>
     <datalist id="tableSuggestions"></datalist>
+
+    <details class="raw-text-details guest-extra-details">
+      <summary>Correo, WhatsApp, ocupación…</summary>
+      <label>Correo (opcional)<input id="guestCorreoInput" type="email" placeholder="correo@ejemplo.com"></label>
+      <label>WhatsApp / Teléfono (opcional)
+        <div class="input-with-btn">
+          <input id="guestTelefonoInput" type="tel" placeholder="Ej: 809-555-1234">
+          <button id="btnOpenWhatsapp" type="button" class="btn-ghost" title="Abrir chat de WhatsApp">💬</button>
+        </div>
+      </label>
+      <label>Ocupación / Institución (opcional)<input id="guestOcupacionInput" type="text" placeholder="Ej: Médico, Prensa, Estudiante…"></label>
+      <label>¿Trae acompañante?
+        <select id="guestAcompananteInput">
+          <option value="">Sin definir</option>
+          <option value="si">Sí</option>
+          <option value="no">No</option>
+        </select>
+      </label>
+    </details>
+
     <label>Confirmación (opcional)
       <select id="guestConfirmadoInput">
         <option value="">Sin definir</option>

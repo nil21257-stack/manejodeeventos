@@ -72,11 +72,31 @@
       <div class="guest-info">
         <div class="guest-name"></div>
         <div class="guest-table ${g.mesa ? '' : 'unassigned'}"></div>
+        <div class="guest-badges"></div>
       </div>
       <span class="chevron">›</span>`;
     li.querySelector('.guest-name').textContent = g.titulo ? `${g.titulo} ${g.nombre}` : g.nombre;
     li.querySelector('.guest-table').textContent = (g.mesa || 'Sin mesa asignada') + (g.nota ? ' 📝' : '');
     if (g.nota) li.querySelector('.guest-table').title = g.nota;
+    const badgesEl = li.querySelector('.guest-badges');
+    if (g.acompanante === 'si') {
+      const b = document.createElement('span');
+      b.className = 'badge-plusone';
+      b.textContent = '+1';
+      badgesEl.appendChild(b);
+    }
+    if (g.telefono) {
+      const wa = document.createElement('button');
+      wa.className = 'badge-whatsapp';
+      wa.textContent = '💬';
+      wa.title = 'Abrir WhatsApp';
+      wa.addEventListener('click', ev => {
+        ev.stopPropagation();
+        window.open('https://wa.me/' + g.telefono.replace(/\D/g, ''), '_blank');
+      });
+      badgesEl.appendChild(wa);
+    }
+    if (!badgesEl.children.length) badgesEl.remove();
     if (!g.llego) li.querySelector('.guest-avatar').style.background = avatarColor(g.nombre);
     li.querySelector('.guest-avatar').addEventListener('click', ev => {
       ev.stopPropagation();
@@ -173,6 +193,10 @@
       $('#guestTableInput').value = g.mesa;
       $('#guestNotaInput').value = g.nota || '';
       $('#guestConfirmadoInput').value = g.confirmado || '';
+      $('#guestCorreoInput').value = g.correo || '';
+      $('#guestTelefonoInput').value = g.telefono || '';
+      $('#guestOcupacionInput').value = g.ocupacion || '';
+      $('#guestAcompananteInput').value = g.acompanante || '';
       $('#btnDeleteGuest').classList.remove('hidden');
     } else {
       $('#modalGuestTitle').textContent = 'Nuevo invitado';
@@ -181,6 +205,10 @@
       $('#guestTableInput').value = '';
       $('#guestNotaInput').value = '';
       $('#guestConfirmadoInput').value = '';
+      $('#guestCorreoInput').value = '';
+      $('#guestTelefonoInput').value = '';
+      $('#guestOcupacionInput').value = '';
+      $('#guestAcompananteInput').value = '';
       $('#btnDeleteGuest').classList.add('hidden');
     }
     fillTableSuggestions();
@@ -207,6 +235,12 @@
     const titulo = $('#guestTituloInput').value.trim();
     const nota = $('#guestNotaInput').value.trim();
     const confirmado = $('#guestConfirmadoInput').value;
+    const extra = {
+      correo: $('#guestCorreoInput').value.trim(),
+      telefono: $('#guestTelefonoInput').value.trim(),
+      ocupacion: $('#guestOcupacionInput').value.trim(),
+      acompanante: $('#guestAcompananteInput').value
+    };
     if (!nombre) { toast('Escribe el nombre del invitado'); return; }
     if (mesa) {
       const avail = DB.tableAvailability(mesa, editingGuestId);
@@ -219,11 +253,16 @@
     if (dups.length && !confirm(`Ya existe "${dups[0].nombre}"${dups[0].mesa ? ' en ' + dups[0].mesa : ''}. ¿Agregar de todas formas?`)) {
       return;
     }
-    if (editingGuestId) DB.updateGuest(editingGuestId, nombre, mesa, titulo, nota, confirmado);
-    else DB.addGuest(nombre, mesa, false, titulo, nota, confirmado);
+    if (editingGuestId) DB.updateGuest(editingGuestId, nombre, mesa, titulo, nota, confirmado, extra);
+    else DB.addGuest(nombre, mesa, false, titulo, nota, confirmado, extra);
     closeGuestModal();
     renderAll();
     toast('Guardado');
+  });
+  $('#btnOpenWhatsapp').addEventListener('click', () => {
+    const digits = $('#guestTelefonoInput').value.replace(/\D/g, '');
+    if (!digits) { toast('Escribe un número primero'); return; }
+    window.open('https://wa.me/' + digits, '_blank');
   });
   $('#btnDeleteGuest').addEventListener('click', () => {
     if (!editingGuestId) return;

@@ -144,6 +144,10 @@ const DB = {
       if (g.titulo === undefined) g.titulo = '';
       if (g.nota === undefined) g.nota = '';
       if (g.confirmado === undefined) g.confirmado = ''; // '', 'si', 'no'
+      if (g.correo === undefined) g.correo = '';
+      if (g.telefono === undefined) g.telefono = '';
+      if (g.ocupacion === undefined) g.ocupacion = '';
+      if (g.acompanante === undefined) g.acompanante = ''; // '', 'si', 'no'
     });
     this._data.tables.forEach(t => {
       if (t.capacidad === undefined) t.capacidad = null;
@@ -209,7 +213,8 @@ const DB = {
     this.save();
   },
 
-  addGuest(nombre, mesa, llego, titulo, nota, confirmado) {
+  addGuest(nombre, mesa, llego, titulo, nota, confirmado, extra) {
+    extra = extra || {};
     const g = {
       id: newId('g'),
       nombre: nombre.trim(),
@@ -217,7 +222,11 @@ const DB = {
       llego: !!llego,
       titulo: (titulo || '').trim(),
       nota: (nota || '').trim(),
-      confirmado: confirmado || ''
+      confirmado: confirmado || '',
+      correo: (extra.correo || '').trim(),
+      telefono: (extra.telefono || '').trim(),
+      ocupacion: (extra.ocupacion || '').trim(),
+      acompanante: extra.acompanante || ''
     };
     this.load().guests.push(g);
     this._ensureTable(g.mesa);
@@ -225,7 +234,7 @@ const DB = {
     return g;
   },
 
-  updateGuest(id, nombre, mesa, titulo, nota, confirmado) {
+  updateGuest(id, nombre, mesa, titulo, nota, confirmado, extra) {
     const g = this.guests.find(x => x.id === id);
     if (!g) return;
     g.nombre = nombre.trim();
@@ -233,6 +242,12 @@ const DB = {
     if (titulo !== undefined) g.titulo = (titulo || '').trim();
     if (nota !== undefined) g.nota = (nota || '').trim();
     if (confirmado !== undefined) g.confirmado = confirmado || '';
+    if (extra) {
+      if (extra.correo !== undefined) g.correo = (extra.correo || '').trim();
+      if (extra.telefono !== undefined) g.telefono = (extra.telefono || '').trim();
+      if (extra.ocupacion !== undefined) g.ocupacion = (extra.ocupacion || '').trim();
+      if (extra.acompanante !== undefined) g.acompanante = extra.acompanante || '';
+    }
     this._ensureTable(g.mesa);
     this.save();
   },
@@ -342,7 +357,9 @@ const DB = {
     }
     rows.forEach(r => {
       if (!r.nombre) return;
-      this.addGuest(r.nombre, r.mesa || '');
+      this.addGuest(r.nombre, r.mesa || '', false, '', '', '', {
+        correo: r.correo, telefono: r.telefono, ocupacion: r.ocupacion, acompanante: r.acompanante
+      });
     });
     this.save();
   },

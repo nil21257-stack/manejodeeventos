@@ -139,6 +139,21 @@ main{max-width:640px;margin:0 auto;padding:16px 16px 24px;}
 .raw-text-details{margin-top:6px;}
 .raw-text-details summary{color:var(--gold-soft);font-size:12.5px;cursor:pointer;padding:6px 0;}
 .raw-text-details textarea{margin-top:6px;}
+.guest-extra-details{margin-bottom:14px;}
+.guest-extra-details label{margin-top:12px;margin-bottom:0;}
+.input-with-btn{display:flex;gap:8px;align-items:center;margin-top:6px;}
+.input-with-btn input{margin-top:0 !important;flex:1;}
+.input-with-btn .btn-ghost{padding:9px 12px;flex-shrink:0;}
+
+/* Indicadores rápidos en la fila del invitado */
+.guest-badges{display:flex;gap:6px;margin-top:2px;}
+.badge-plusone{
+  font-size:10px;font-weight:700;color:var(--ink);background:var(--gold-soft);
+  border-radius:999px;padding:1px 6px;
+}
+.badge-whatsapp{
+  font-size:15px;line-height:1;background:none;border:none;padding:2px;flex-shrink:0;
+}
 
 .share-option-btn{
   display:flex;align-items:center;gap:12px;width:100%;text-align:left;
