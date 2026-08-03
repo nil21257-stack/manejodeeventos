@@ -95,9 +95,17 @@
       </div>
       <span class="chevron">›</span>`;
     li.querySelector('.guest-name').textContent = (isCompanion ? '↳ ' : '') + (isAutoCompanionName(g) ? 'Acompañante' : (g.titulo ? `${g.titulo} ${g.nombre}` : g.nombre));
-    li.querySelector('.guest-table').textContent = (g.mesa || 'Sin mesa asignada') + (g.nota ? ' 📝' : '');
+    const mesaTexto = (g.mesa || 'Sin mesa asignada') + (g.asiento ? ` · Asiento ${g.asiento}` : '') + (g.nota ? ' 📝' : '');
+    li.querySelector('.guest-table').textContent = mesaTexto;
     if (g.nota) li.querySelector('.guest-table').title = g.nota;
     const badgesEl = li.querySelector('.guest-badges');
+    if (g.categoria) {
+      const cat = document.createElement('span');
+      cat.className = 'badge-categoria';
+      cat.textContent = g.categoria;
+      cat.style.background = avatarColor(g.categoria);
+      badgesEl.appendChild(cat);
+    }
     if (g.acompanante === 'si') {
       const b = document.createElement('span');
       b.className = 'badge-plusone';
@@ -234,6 +242,8 @@
       $('#guestOcupacionInput').value = g.ocupacion || '';
       $('#guestAcompananteInput').value = g.acompanante || '';
       $('#guestAcompananteLabel').classList.toggle('hidden', !!g.companionOf);
+      $('#guestCategoriaInput').value = g.categoria || '';
+      $('#guestAsientoInput').value = g.asiento || '';
       $('#btnDeleteGuest').classList.remove('hidden');
     } else {
       $('#modalGuestTitle').textContent = 'Nuevo invitado';
@@ -247,9 +257,13 @@
       $('#guestOcupacionInput').value = '';
       $('#guestAcompananteInput').value = '';
       $('#guestAcompananteLabel').classList.remove('hidden');
+      $('#guestCategoriaInput').value = '';
+      $('#guestAsientoInput').value = '';
       $('#btnDeleteGuest').classList.add('hidden');
     }
     fillTableSuggestions();
+    fillCategoriaSuggestions();
+    updateAsientoFieldVisibility();
     modal.classList.remove('hidden');
     setTimeout(() => $('#guestNameInput').focus(), 50);
   }
@@ -265,6 +279,25 @@
     });
   }
 
+  function fillCategoriaSuggestions() {
+    const dl = $('#categoriaSuggestions');
+    dl.innerHTML = '';
+    const cats = new Set(DB.guests.map(g => g.categoria).filter(Boolean));
+    cats.forEach(c => {
+      const opt = document.createElement('option');
+      opt.value = c;
+      dl.appendChild(opt);
+    });
+  }
+
+  // Muestra el campo "Asiento" solo si la mesa escrita es de tipo "fila"
+  function updateAsientoFieldVisibility() {
+    const t = DB.findTableByName($('#guestTableInput').value.trim());
+    $('#guestAsientoLabel').classList.toggle('hidden', !(t && t.tipo === 'fila'));
+  }
+  $('#guestTableInput').addEventListener('input', updateAsientoFieldVisibility);
+  $('#guestTableInput').addEventListener('change', updateAsientoFieldVisibility);
+
   $('#btnAddGuest').addEventListener('click', () => openGuestModal(null));
   $('#btnCancelGuest').addEventListener('click', closeGuestModal);
   $('#btnSaveGuest').addEventListener('click', () => {
@@ -273,11 +306,14 @@
     const titulo = $('#guestTituloInput').value.trim();
     const nota = $('#guestNotaInput').value.trim();
     const confirmado = $('#guestConfirmadoInput').value;
+    const categoria = $('#guestCategoriaInput').value.trim();
+    const asiento = $('#guestAsientoInput').value.trim();
     const extra = {
       correo: $('#guestCorreoInput').value.trim(),
       telefono: $('#guestTelefonoInput').value.trim(),
       ocupacion: $('#guestOcupacionInput').value.trim(),
-      acompanante: $('#guestAcompananteInput').value
+      acompanante: $('#guestAcompananteInput').value,
+      categoria, asiento
     };
     if (!nombre) { toast('Escribe el nombre del invitado'); return; }
     const existingGuest = editingGuestId ? DB.guests.find(x => x.id === editingGuestId) : null;
@@ -287,6 +323,10 @@
       const avail = DB.tableAvailability(mesa, editingGuestId);
       if (avail && avail.disponibles < neededSeats) {
         toast(`"${mesa}" no tiene espacio suficiente (necesita ${neededSeats} asientos, quedan ${avail.disponibles})`);
+        return;
+      }
+      if (asiento && DB.seatTaken(mesa, asiento, editingGuestId)) {
+        toast(`El asiento ${asiento} ya está ocupado en "${mesa}"`);
         return;
       }
     }
@@ -344,6 +384,37 @@
     tables.forEach(t => {
       const guests = DB.guestsInTable(t.name);
       const over = t.capacidad != null && guests.length > t.capacidad;
+
+      if (t.tipo === 'fila') {
+        const card = document.createElement('div');
+        card.className = 'fila-card' + (over ? ' overbooked' : '');
+        const occText = t.capacidad != null ? `${guests.length}/${t.capacidad} asientos` : `${guests.length} invitado${guests.length === 1 ? '' : 's'}`;
+        card.innerHTML = `<div class="fila-header"><span class="fila-name"></span><span class="fila-occupancy"></span></div><div class="fila-seats"></div>`;
+        card.querySelector('.fila-name').textContent = t.name + (t.etiqueta ? ' — ' + t.etiqueta : '');
+        card.querySelector('.fila-occupancy').textContent = occText;
+        const seatsEl = card.querySelector('.fila-seats');
+        const total = t.capacidad || guests.length || 0;
+        for (let n = 1; n <= total; n++) {
+          const g = guests.find(x => String(x.asiento || '').trim() === String(n));
+          const seat = document.createElement('div');
+          seat.className = 'fila-seat' + (g ? ' taken' : '');
+          seat.textContent = n;
+          if (g) seat.title = g.nombre;
+          seatsEl.appendChild(seat);
+        }
+        // Invitados en esta fila sin número de asiento asignado
+        const sinAsiento = guests.filter(g => !g.asiento);
+        if (sinAsiento.length) {
+          const warn = document.createElement('div');
+          warn.className = 'fila-sin-asiento';
+          warn.textContent = `⚠ ${sinAsiento.length} sin asiento asignado`;
+          card.appendChild(warn);
+        }
+        card.addEventListener('click', () => openTableDetail(t.id));
+        floor.appendChild(card);
+        return;
+      }
+
       const card = document.createElement('div');
       card.className = 'table-card' + (guests.length === 0 ? ' empty' : '') + (over ? ' overbooked' : '');
       const occText = t.capacidad != null
@@ -494,7 +565,7 @@
         ensureSpace(g.correo || g.telefono || g.ocupacion ? 2 : 1);
         doc.setFont('helvetica', 'normal'); doc.setFontSize(11); doc.setTextColor(0);
         const prefix = g.companionOf ? '↳ ' : `${i + 1}. `;
-        const label = `${prefix}${g.titulo ? g.titulo + ' ' : ''}${g.nombre}${g.llego ? '  ✓' : ''}${g.acompanante === 'si' ? '  (+1)' : ''}`;
+        const label = `${prefix}${g.titulo ? g.titulo + ' ' : ''}${g.nombre}${g.asiento ? ' (Asiento ' + g.asiento + ')' : ''}${g.llego ? '  ✓' : ''}${g.acompanante === 'si' ? '  (+1)' : ''}`;
         doc.text(label, x, y); y += 13;
         const detailParts = [g.ocupacion, g.telefono, g.correo].filter(Boolean);
         if (detailParts.length) {
@@ -540,11 +611,11 @@
       return /[",\n]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s;
     };
     const siNoTexto = v => v === 'si' ? 'Sí' : v === 'no' ? 'No' : '';
-    const rows = [['Nombre', 'Título', 'Mesa', 'Correo', 'WhatsApp', 'Ocupación', 'Acompañante', 'Es acompañante de', 'Confirmado', 'Llegó', 'Nota']];
+    const rows = [['Nombre', 'Título', 'Mesa', 'Asiento', 'Categoría', 'Correo', 'WhatsApp', 'Ocupación', 'Acompañante', 'Es acompañante de', 'Confirmado', 'Llegó', 'Nota']];
     DB.guests.forEach(g => {
       const parentName = g.companionOf ? (DB.guests.find(x => x.id === g.companionOf)?.nombre || '') : '';
       rows.push([
-        g.nombre, g.titulo || '', g.mesa || '', g.correo || '', g.telefono || '',
+        g.nombre, g.titulo || '', g.mesa || '', g.asiento || '', g.categoria || '', g.correo || '', g.telefono || '',
         g.ocupacion || '', siNoTexto(g.acompanante), parentName, siNoTexto(g.confirmado), g.llego ? 'Sí' : 'No', g.nota || ''
       ]);
     });
@@ -553,6 +624,62 @@
     const ev = DB.event;
     const filename = `invitados-${(ev.name || 'evento').toLowerCase().replace(/[^a-z0-9]+/g, '-')}.csv`;
     await shareOrDownloadFile(blob, filename, 'CSV');
+  });
+
+  $('#btnSendEmails').addEventListener('click', async () => {
+    $('#modalShareOptions').classList.add('hidden');
+    const ev = DB.event;
+    if (!ev.emailjsService || !ev.emailjsTemplate || !ev.emailjsPublicKey) {
+      if (confirm('Todavía no has configurado el envío de correos (EmailJS) para este evento. ¿Ir a Ajustes para configurarlo?')) {
+        $('#btnSettings').click();
+      }
+      return;
+    }
+    if (!navigator.onLine) {
+      alert('Sin conexión a internet — enviar correos necesita internet.');
+      return;
+    }
+    const destinatarios = DB.guests.filter(g => g.correo && g.correo.trim());
+    if (!destinatarios.length) {
+      toast('Ningún invitado tiene correo registrado');
+      return;
+    }
+    if (!confirm(`Se enviará la invitación por correo a ${destinatarios.length} invitado${destinatarios.length === 1 ? '' : 's'}. ¿Continuar?`)) {
+      return;
+    }
+    try {
+      await loadScriptOnce('vendor/email.min.js', () => window.emailjs);
+      window.emailjs.init({ publicKey: ev.emailjsPublicKey });
+    } catch (err) {
+      console.error(err);
+      alert('No se pudo cargar el sistema de envío de correos.');
+      return;
+    }
+
+    const dateStr = ev.date ? new Date(ev.date + 'T00:00').toLocaleDateString('es-DO', { day: 'numeric', month: 'long', year: 'numeric' }) : '';
+    let ok = 0, fail = 0;
+    for (let i = 0; i < destinatarios.length; i++) {
+      const g = destinatarios[i];
+      setStatus(`Enviando correos… ${i + 1}/${destinatarios.length}`);
+      $('#importStatus').classList.remove('hidden');
+      try {
+        await window.emailjs.send(ev.emailjsService, ev.emailjsTemplate, {
+          to_email: g.correo,
+          to_name: g.titulo ? `${g.titulo} ${g.nombre}` : g.nombre,
+          event_name: ev.name || 'Mi evento',
+          event_date: dateStr,
+          event_hora: ev.hora || '',
+          event_lugar: ev.lugar || ''
+        });
+        ok++;
+      } catch (err) {
+        console.error('Error enviando a', g.correo, err);
+        fail++;
+      }
+      await new Promise(r => setTimeout(r, 300)); // pequeña pausa entre envíos
+    }
+    $('#importStatus').classList.add('hidden');
+    alert(`Envío terminado: ${ok} correo${ok === 1 ? '' : 's'} enviado${ok === 1 ? '' : 's'} correctamente${fail ? `, ${fail} con error` : ''}.`);
   });
 
   // ---------------- Imprimir plano de mesas ----------------
@@ -586,14 +713,24 @@
     openTableModal(detailTableId);
   });
 
+  function updateTableTypeLabels() {
+    const isFila = $('#newTableTipo').value === 'fila';
+    $('#newTableNameLabel').firstChild.textContent = isFila ? 'Nombre de la fila' : 'Nombre o número';
+    $('#newTableName').placeholder = isFila ? 'Ej: Fila A' : 'Ej: Mesa 5';
+    $('#newTableCapacityLabel').firstChild.textContent = isFila ? 'Cantidad de asientos' : 'Asientos disponibles (opcional)';
+  }
+  $('#newTableTipo').addEventListener('change', updateTableTypeLabels);
+
   function openTableModal(tableId) {
     editingTableId = tableId || null;
     const t = tableId ? DB.tables.find(x => x.id === tableId) : null;
     $('#modalTableTitle').textContent = t ? 'Editar mesa' : 'Nueva mesa';
+    $('#newTableTipo').value = t ? (t.tipo || 'mesa') : 'mesa';
     $('#newTableName').value = t ? t.name : '';
     $('#newTableCapacity').value = (t && t.capacidad != null) ? t.capacidad : '';
     $('#newTableLabel').value = t ? t.etiqueta : '';
     $('#btnDeleteTable').classList.toggle('hidden', !t);
+    updateTableTypeLabels();
     $('#modalTable').classList.remove('hidden');
     setTimeout(() => $('#newTableName').focus(), 50);
   }
@@ -604,9 +741,11 @@
     const name = $('#newTableName').value.trim();
     const capacidad = $('#newTableCapacity').value.trim();
     const etiqueta = $('#newTableLabel').value.trim();
+    const tipo = $('#newTableTipo').value;
     if (!name) { toast('Escribe un nombre para la mesa'); return; }
-    if (editingTableId) DB.updateTable(editingTableId, name, capacidad, etiqueta);
-    else DB.addTable(name, capacidad, etiqueta);
+    if (tipo === 'fila' && !capacidad) { toast('Escribe cuántos asientos tiene la fila'); return; }
+    if (editingTableId) DB.updateTable(editingTableId, name, capacidad, etiqueta, tipo);
+    else DB.addTable(name, capacidad, etiqueta, tipo);
     $('#modalTable').classList.add('hidden');
     renderAll();
     toast('Mesa guardada');
@@ -720,13 +859,24 @@
     $('#settingsEventHora').value = DB.event.hora || '';
     $('#settingsEventLugar').value = DB.event.lugar || '';
     $('#settingsSheetsUrl').value = DB.event.sheetsUrl || '';
+    $('#settingsEmailjsService').value = DB.event.emailjsService || '';
+    $('#settingsEmailjsTemplate').value = DB.event.emailjsTemplate || '';
+    $('#settingsEmailjsPublicKey').value = DB.event.emailjsPublicKey || '';
     renderInvitationBox();
     renderEventsList();
     $('#modalSettings').classList.remove('hidden');
   });
   $('#btnCancelSettings').addEventListener('click', () => $('#modalSettings').classList.add('hidden'));
   $('#btnSaveSettings').addEventListener('click', () => {
-    DB.saveEvent($('#settingsEventName').value, $('#settingsEventDate').value, $('#settingsEventLugar').value, $('#settingsEventHora').value, $('#settingsSheetsUrl').value.trim());
+    DB.saveEvent(
+      $('#settingsEventName').value, $('#settingsEventDate').value, $('#settingsEventLugar').value, $('#settingsEventHora').value,
+      $('#settingsSheetsUrl').value.trim(),
+      {
+        service: $('#settingsEmailjsService').value.trim(),
+        template: $('#settingsEmailjsTemplate').value.trim(),
+        publicKey: $('#settingsEmailjsPublicKey').value.trim()
+      }
+    );
     $('#modalSettings').classList.add('hidden');
     renderHeader();
     toast('Ajustes guardados');
@@ -830,7 +980,7 @@
     try {
       const { rows } = await Importers.parseSheetsUrl(url);
       if (!rows.length) { setStatus('La hoja no tiene filas con nombres, o no se reconoció ninguna columna de nombre.', true); return; }
-      showPreview(rows);
+      showPreview(rows, { suggestReplace: true });
       $('#importStatus').classList.add('hidden');
     } catch (err) {
       console.error(err);
@@ -898,11 +1048,13 @@
     showPreview(rows);
   });
 
-  function showPreview(rows) {
+  function showPreview(rows, opts) {
     pendingImportRows = rows;
     $('#importReview').classList.add('hidden');
     $('#importPreview').classList.remove('hidden');
     renderPreviewList(rows);
+    $('#replaceExisting').checked = !!(opts && opts.suggestReplace);
+    $('#replaceHint').classList.toggle('hidden', !(opts && opts.suggestReplace));
   }
 
   function renderPreviewList(rows) {

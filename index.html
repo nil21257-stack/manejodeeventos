@@ -142,6 +142,7 @@
           <input type="checkbox" id="replaceExisting">
           <span>Reemplazar lista actual en vez de agregar</span>
         </label>
+        <p class="hint hidden" id="replaceHint" style="margin-top:-6px;">Al sincronizar desde Google Sheets, esto viene marcado por defecto para evitar duplicados en cada sincronización — desmárcalo si prefieres sumar a la lista actual.</p>
         <button id="btnConfirmImport" class="btn-primary">Importar invitados</button>
       </div>
     </div>
@@ -176,6 +177,11 @@
     </datalist>
     <label>Mesa<input id="guestTableInput" type="text" placeholder="Ej: Mesa 3, Familia López…" list="tableSuggestions"></label>
     <datalist id="tableSuggestions"></datalist>
+    <label id="guestAsientoLabel" class="hidden">Asiento
+      <input id="guestAsientoInput" type="text" placeholder="Ej: 12">
+    </label>
+    <label>Categoría (opcional)<input id="guestCategoriaInput" type="text" placeholder="Ej: VIP, Oro, Plata, Bronce…" list="categoriaSuggestions"></label>
+    <datalist id="categoriaSuggestions"></datalist>
 
     <details class="raw-text-details guest-extra-details">
       <summary>Correo, WhatsApp, ocupación…</summary>
@@ -234,8 +240,14 @@
   <div class="modal-card">
     <button class="modal-close-x" data-close="btnCancelTable" aria-label="Cerrar">✕</button>
     <h3 id="modalTableTitle">Nueva mesa</h3>
-    <label>Nombre o número<input id="newTableName" type="text" placeholder="Ej: Mesa 5"></label>
-    <label>Asientos disponibles (opcional)<input id="newTableCapacity" type="number" min="0" placeholder="Ej: 8"></label>
+    <label>Tipo
+      <select id="newTableTipo">
+        <option value="mesa">Mesa redonda</option>
+        <option value="fila">Fila de asientos (sala sin mesas)</option>
+      </select>
+    </label>
+    <label id="newTableNameLabel">Nombre o número<input id="newTableName" type="text" placeholder="Ej: Mesa 5"></label>
+    <label id="newTableCapacityLabel">Asientos disponibles (opcional)<input id="newTableCapacity" type="number" min="0" placeholder="Ej: 8"></label>
     <label>Etiqueta (opcional)<input id="newTableLabel" type="text" placeholder="Ej: Familia Pérez"></label>
     <div class="modal-actions">
       <button id="btnDeleteTable" class="btn-danger hidden">Eliminar mesa</button>
@@ -288,6 +300,16 @@
     <p class="hint">Para traer invitados directo desde las respuestas de un Google Form. En tu hoja de
       respuestas: <strong>Archivo → Compartir → Publicar en la web</strong> → elige esa hoja → formato
       <strong>CSV</strong> → Publicar, y pega aquí el link que te da.</p>
+
+    <label>Envío de correos (opcional)</label>
+    <p class="hint">Para poder mandar la invitación por correo a todos los invitados que tengan correo
+      registrado. Crea una cuenta gratis en <strong>emailjs.com</strong>, conecta tu correo (Gmail, Outlook, etc.)
+      como "Service", crea una "Template" que use estas variables exactas: <code>to_email</code>,
+      <code>to_name</code>, <code>event_name</code>, <code>event_date</code>, <code>event_hora</code>,
+      <code>event_lugar</code> — y pega aquí los 3 IDs que te da (Service ID, Template ID, Public Key).</p>
+    <input id="settingsEmailjsService" type="text" placeholder="Service ID (ej: service_xxxxx)" style="margin-bottom:10px;">
+    <input id="settingsEmailjsTemplate" type="text" placeholder="Template ID (ej: template_xxxxx)" style="margin-bottom:10px;">
+    <input id="settingsEmailjsPublicKey" type="text" placeholder="Public Key" style="margin-bottom:14px;">
 
     <label>Invitación del evento (opcional)</label>
     <p class="hint">Sube una foto de la invitación. La app intenta leer el nombre, la fecha, la hora y el lugar automáticamente para que solo confirmes o corrijas.</p>
@@ -374,6 +396,13 @@
       <span class="share-option-text">
         <strong>Lista en CSV</strong>
         <small>Para que otra persona con esta app lo importe directo en Importar → Excel/CSV</small>
+      </span>
+    </button>
+    <button id="btnSendEmails" class="share-option-btn">
+      <span class="share-option-icon">📧</span>
+      <span class="share-option-text">
+        <strong>Enviar invitación por correo</strong>
+        <small>A todos los invitados que tengan correo registrado (requiere configurar EmailJS en Ajustes)</small>
       </span>
     </button>
     <div class="modal-actions">

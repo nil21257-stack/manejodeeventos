@@ -137,6 +137,9 @@ const DB = {
     if (this._data.event.lugar === undefined) this._data.event.lugar = '';
     if (this._data.event.hora === undefined) this._data.event.hora = '';
     if (this._data.event.sheetsUrl === undefined) this._data.event.sheetsUrl = '';
+    if (this._data.event.emailjsService === undefined) this._data.event.emailjsService = '';
+    if (this._data.event.emailjsTemplate === undefined) this._data.event.emailjsTemplate = '';
+    if (this._data.event.emailjsPublicKey === undefined) this._data.event.emailjsPublicKey = '';
     if (this._data.event.invitacion === undefined) this._data.event.invitacion = null; // dataURL base64 o null
     if (!Array.isArray(this._data.guests)) this._data.guests = [];
     if (!Array.isArray(this._data.tables)) this._data.tables = [];
@@ -149,12 +152,15 @@ const DB = {
       if (g.telefono === undefined) g.telefono = '';
       if (g.ocupacion === undefined) g.ocupacion = '';
       if (g.acompanante === undefined) g.acompanante = ''; // '', 'si', 'no'
+      if (g.categoria === undefined) g.categoria = ''; // texto libre: VIP, Oro, Plata, Bronce, etc.
+      if (g.asiento === undefined) g.asiento = ''; // número/etiqueta de asiento (para mesas tipo "fila")
       if (g.companionId === undefined) g.companionId = null; // id del invitado "acompañante" generado automáticamente
       if (g.companionOf === undefined) g.companionOf = null; // si ESTE invitado ES un acompañante generado, id de a quién acompaña
     });
     this._data.tables.forEach(t => {
       if (t.capacidad === undefined) t.capacidad = null;
       if (t.etiqueta === undefined) t.etiqueta = '';
+      if (t.tipo === undefined) t.tipo = 'mesa'; // 'mesa' (redonda, con capacidad) | 'fila' (asientos numerados, sin mesa física)
     });
     return this._data;
   },
@@ -177,14 +183,18 @@ const DB = {
   get guests() { return this.load().guests; },
   get tables() { return this.load().tables; },
 
-  saveEvent(name, date, lugar, hora, sheetsUrl) {
+  saveEvent(name, date, lugar, hora, sheetsUrl, emailjs) {
     const prev = this.load().event;
+    emailjs = emailjs || {};
     this._data.event = {
       name: name || 'Mi evento',
       date: date || '',
       lugar: (lugar !== undefined ? lugar : prev.lugar) || '',
       hora: (hora !== undefined ? hora : prev.hora) || '',
       sheetsUrl: (sheetsUrl !== undefined ? sheetsUrl : prev.sheetsUrl) || '',
+      emailjsService: (emailjs.service !== undefined ? emailjs.service : prev.emailjsService) || '',
+      emailjsTemplate: (emailjs.template !== undefined ? emailjs.template : prev.emailjsTemplate) || '',
+      emailjsPublicKey: (emailjs.publicKey !== undefined ? emailjs.publicKey : prev.emailjsPublicKey) || '',
       invitacion: prev.invitacion || null
     };
     this.save();
@@ -252,6 +262,8 @@ const DB = {
       telefono: (extra.telefono || '').trim(),
       ocupacion: (extra.ocupacion || '').trim(),
       acompanante: extra.acompanante || '',
+      categoria: (extra.categoria || '').trim(),
+      asiento: (extra.asiento || '').toString().trim(),
       companionId: null,
       companionOf: extra.companionOf || null
     };
@@ -274,6 +286,8 @@ const DB = {
       if (extra.telefono !== undefined) g.telefono = (extra.telefono || '').trim();
       if (extra.ocupacion !== undefined) g.ocupacion = (extra.ocupacion || '').trim();
       if (extra.acompanante !== undefined) g.acompanante = extra.acompanante || '';
+      if (extra.categoria !== undefined) g.categoria = (extra.categoria || '').trim();
+      if (extra.asiento !== undefined) g.asiento = (extra.asiento || '').toString().trim();
     }
     this._ensureTable(g.mesa);
     // Si este invitado tiene un acompañante vinculado, lo mueve con él a la misma mesa
@@ -328,11 +342,11 @@ const DB = {
     const n = (name || '').trim();
     if (!n) return;
     if (!this.load().tables.find(t => t.name.toLowerCase() === n.toLowerCase())) {
-      this._data.tables.push({ id: newId('t'), name: n, capacidad: null, etiqueta: '' });
+      this._data.tables.push({ id: newId('t'), name: n, capacidad: null, etiqueta: '', tipo: 'mesa' });
     }
   },
 
-  addTable(name, capacidad, etiqueta) {
+  addTable(name, capacidad, etiqueta, tipo) {
     const n = name.trim();
     if (!n) return null;
     const existing = this.tables.find(t => t.name.toLowerCase() === n.toLowerCase());
@@ -340,20 +354,22 @@ const DB = {
     const t = {
       id: newId('t'), name: n,
       capacidad: (capacidad || capacidad === 0) ? Number(capacidad) : null,
-      etiqueta: (etiqueta || '').trim()
+      etiqueta: (etiqueta || '').trim(),
+      tipo: tipo === 'fila' ? 'fila' : 'mesa'
     };
     this.load().tables.push(t);
     this.save();
     return t;
   },
 
-  updateTable(id, name, capacidad, etiqueta) {
+  updateTable(id, name, capacidad, etiqueta, tipo) {
     const t = this.tables.find(x => x.id === id);
     if (!t) return;
     const oldName = t.name;
     t.name = name.trim();
     t.capacidad = (capacidad || capacidad === 0) ? Number(capacidad) : null;
     t.etiqueta = (etiqueta || '').trim();
+    if (tipo !== undefined) t.tipo = tipo === 'fila' ? 'fila' : 'mesa';
     if (oldName.toLowerCase() !== t.name.toLowerCase()) {
       this.guests.forEach(g => {
         if (g.mesa.toLowerCase() === oldName.toLowerCase()) g.mesa = t.name;
@@ -390,6 +406,13 @@ const DB = {
     return { capacidad: t.capacidad, ocupados, disponibles: t.capacidad - ocupados, llena: ocupados >= t.capacidad };
   },
 
+  // Para mesas tipo "fila": ¿ese número de asiento ya lo tiene otro invitado en esa misma fila?
+  seatTaken(mesaName, asiento, excludeGuestId) {
+    const a = String(asiento || '').trim();
+    if (!a) return false;
+    return this.guestsInTable(mesaName).some(g => g.id !== excludeGuestId && String(g.asiento || '').trim() === a);
+  },
+
   overbookedTables() {
     return this.tables
       .filter(t => t.capacidad != null)
@@ -410,7 +433,8 @@ const DB = {
     mainRows.forEach(r => {
       if (!r.nombre) return;
       const g = this.addGuest(r.nombre, r.mesa || '', r.llego || false, r.titulo || '', r.nota || '', r.confirmado || '', {
-        correo: r.correo, telefono: r.telefono, ocupacion: r.ocupacion, acompanante: r.acompanante
+        correo: r.correo, telefono: r.telefono, ocupacion: r.ocupacion, acompanante: r.acompanante,
+        categoria: r.categoria, asiento: r.asiento
       });
       created.push({ row: r, guest: g });
     });

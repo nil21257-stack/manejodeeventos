@@ -50,6 +50,8 @@ const Importers = {
     const confirmadoCol = headerCandidates.findIndex(c => /confirmad|rsvp/.test(c));
     const llegoCol = headerCandidates.findIndex(c => /lleg[oó]/.test(c));
     const notaCol = headerCandidates.findIndex(c => /^nota|observaci[oó]n/.test(c));
+    const categoriaCol = headerCandidates.findIndex(c => /categor[ií]a|clasificaci[oó]n|nivel/.test(c));
+    const asientoCol = headerCandidates.findIndex(c => /asiento|silla\s*#|seat/.test(c));
 
     let dataRows = rows;
     let nCol = nameCol, tCol = tableCol;
@@ -83,6 +85,8 @@ const Importers = {
       if (confirmadoCol > -1) row.confirmado = normSiNo(r[confirmadoCol]);
       if (llegoCol > -1) row.llego = /^(s[ií]|yes|x|1|true)/i.test(String(r[llegoCol] || '').trim());
       if (notaCol > -1) row.nota = String(r[notaCol] ?? '').trim();
+      if (categoriaCol > -1) row.categoria = String(r[categoriaCol] ?? '').trim();
+      if (asientoCol > -1) row.asiento = String(r[asientoCol] ?? '').trim();
       out.push(row);
     });
 
