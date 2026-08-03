@@ -78,7 +78,7 @@
           <div class="guest-table ${g.mesa ? '' : 'unassigned'}"></div>
         </div>`;
       li.querySelector('.guest-name').textContent = (isCompanion ? '↳ ' : '') + (isAutoCompanionName(g) ? 'Acompañante' : (g.titulo ? `${g.titulo} ${g.nombre}` : g.nombre));
-      li.querySelector('.guest-table').textContent = (g.mesa || 'Sin mesa asignada') + (g.nota ? ' 📝' : '');
+      li.querySelector('.guest-table').textContent = (g.mesa || 'Sin mesa/fila asignada') + (g.nota ? ' 📝' : '');
       li.addEventListener('click', () => {
         if (selectedIds.has(g.id)) selectedIds.delete(g.id); else selectedIds.add(g.id);
         renderGuests();
@@ -95,7 +95,7 @@
       </div>
       <span class="chevron">›</span>`;
     li.querySelector('.guest-name').textContent = (isCompanion ? '↳ ' : '') + (isAutoCompanionName(g) ? 'Acompañante' : (g.titulo ? `${g.titulo} ${g.nombre}` : g.nombre));
-    const mesaTexto = (g.mesa || 'Sin mesa asignada') + (g.asiento ? ` · Asiento ${g.asiento}` : '') + (g.nota ? ' 📝' : '');
+    const mesaTexto = (g.mesa || 'Sin mesa/fila asignada') + (g.asiento ? ` · Asiento ${g.asiento}` : '') + (g.nota ? ' 📝' : '');
     li.querySelector('.guest-table').textContent = mesaTexto;
     if (g.nota) li.querySelector('.guest-table').title = g.nota;
     const badgesEl = li.querySelector('.guest-badges');
@@ -591,7 +591,7 @@
         ensureSpace(3);
         doc.setDrawColor(210); doc.line(marginX, y, pageW - marginX, y); y += 18;
         doc.setFont('helvetica', 'bold'); doc.setFontSize(13);
-        doc.text(`Sin mesa asignada (${sinMesa.length})`, marginX, y); y += 18;
+        doc.text(`Sin mesa/fila asignada (${sinMesa.length})`, marginX, y); y += 18;
         sinMesa.forEach((g, i) => printGuestLine(g, i, marginX + 12));
       }
 
@@ -611,7 +611,7 @@
       return /[",\n]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s;
     };
     const siNoTexto = v => v === 'si' ? 'Sí' : v === 'no' ? 'No' : '';
-    const rows = [['Nombre', 'Título', 'Mesa', 'Asiento', 'Categoría', 'Correo', 'WhatsApp', 'Ocupación', 'Acompañante', 'Es acompañante de', 'Confirmado', 'Llegó', 'Nota']];
+    const rows = [['Nombre', 'Título', 'Mesa/Fila', 'Asiento', 'Categoría', 'Correo', 'WhatsApp', 'Ocupación', 'Acompañante', 'Es acompañante de', 'Confirmado', 'Llegó', 'Nota']];
     DB.guests.forEach(g => {
       const parentName = g.companionOf ? (DB.guests.find(x => x.id === g.companionOf)?.nombre || '') : '';
       rows.push([
@@ -701,7 +701,7 @@
     });
     const sinMesa = DB.guests.filter(g => !g.mesa);
     if (sinMesa.length) {
-      html += `<div class="print-table"><h3>Sin mesa asignada</h3><ol>`;
+      html += `<div class="print-table"><h3>Sin mesa/fila asignada</h3><ol>`;
       sinMesa.forEach(g => { html += `<li>${escapeAttr(g.nombre)}</li>`; });
       html += '</ol></div>';
     }
@@ -724,7 +724,7 @@
   function openTableModal(tableId) {
     editingTableId = tableId || null;
     const t = tableId ? DB.tables.find(x => x.id === tableId) : null;
-    $('#modalTableTitle').textContent = t ? 'Editar mesa' : 'Nueva mesa';
+    $('#modalTableTitle').textContent = t ? 'Editar mesa/fila' : 'Nueva mesa/fila';
     $('#newTableTipo').value = t ? (t.tipo || 'mesa') : 'mesa';
     $('#newTableName').value = t ? t.name : '';
     $('#newTableCapacity').value = (t && t.capacidad != null) ? t.capacidad : '';
@@ -1185,7 +1185,7 @@
           <div class="guest-table ${g.mesa ? '' : 'unassigned'}"></div>
         </div>`;
       li.querySelector('.guest-name').textContent = (isCompanion ? '↳ ' : '') + (isAutoCompanionName(g) ? 'Acompañante' : (g.titulo ? `${g.titulo} ${g.nombre}` : g.nombre));
-      li.querySelector('.guest-table').textContent = g.mesa || 'Sin mesa asignada';
+      li.querySelector('.guest-table').textContent = g.mesa || 'Sin mesa/fila asignada';
       if (!g.llego) li.querySelector('.guest-avatar').style.background = avatarColor(g.nombre);
       li.addEventListener('click', () => {
         DB.toggleCheckin(g.id);

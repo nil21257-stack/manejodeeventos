@@ -70,10 +70,10 @@
   <!-- MESAS -->
   <section id="view-mesas" class="view">
     <div class="view-head">
-      <h2 class="view-title">Plano de mesas</h2>
+      <h2 class="view-title">Plano de mesas y filas</h2>
       <div class="view-head-actions">
         <button id="btnPrintPlan" class="btn-ghost">🖨 Imprimir</button>
-        <button id="btnAddTable" class="btn-ghost">+ Mesa</button>
+        <button id="btnAddTable" class="btn-ghost">+ Mesa/Fila</button>
       </div>
     </div>
     <div id="tablesFloor" class="tables-floor"></div>
@@ -175,7 +175,7 @@
       <option value="Padre">
       <option value="Pastor">
     </datalist>
-    <label>Mesa<input id="guestTableInput" type="text" placeholder="Ej: Mesa 3, Familia López…" list="tableSuggestions"></label>
+    <label>Mesa/Fila<input id="guestTableInput" type="text" placeholder="Ej: Mesa 3, Fila A, Familia López…" list="tableSuggestions"></label>
     <datalist id="tableSuggestions"></datalist>
     <label id="guestAsientoLabel" class="hidden">Asiento
       <input id="guestAsientoInput" type="text" placeholder="Ej: 12">
@@ -223,10 +223,10 @@
 <div id="modalMove" class="modal hidden">
   <div class="modal-card">
     <button class="modal-close-x" data-close="btnCancelMove" aria-label="Cerrar">✕</button>
-    <h3>Mover a otra mesa</h3>
+    <h3>Mover a otra mesa/fila</h3>
     <p id="moveGuestName" class="hint"></p>
     <div id="moveTableOptions" class="move-options"></div>
-    <label>O escribe una mesa nueva<input id="moveNewTable" type="text" placeholder="Nueva mesa…"></label>
+    <label>O escribe una mesa/fila nueva<input id="moveNewTable" type="text" placeholder="Nueva mesa o fila…"></label>
     <div class="modal-actions">
       <div class="spacer"></div>
       <button id="btnCancelMove" class="btn-ghost">Cancelar</button>
