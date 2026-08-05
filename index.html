@@ -3,8 +3,8 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>Manejo de Eventos — Mesas e Invitados</title>
-<meta name="description" content="Organiza invitados y mesas para tu evento, 100% en tu dispositivo, sin internet.">
+<title>Manejo de Eventos — Mesas/Filas e Invitados</title>
+<meta name="description" content="Organiza invitados y mesas/filas para tu evento, 100% en tu dispositivo, sin internet.">
 <meta name="theme-color" content="#0F3D3E">
 <link rel="manifest" href="manifest.json">
 <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
@@ -40,8 +40,8 @@
     <div class="view-head">
       <div class="stat-row">
         <div class="stat"><strong id="statTotal">0</strong><span id="statTotalLabel">invitados</span></div>
-        <div class="stat"><strong id="statMesas">0</strong><span>mesas</span></div>
-        <div class="stat"><strong id="statSinMesa">0</strong><span>sin mesa</span></div>
+        <div class="stat"><strong id="statMesas">0</strong><span>mesas/filas</span></div>
+        <div class="stat"><strong id="statSinMesa">0</strong><span>sin mesa/fila</span></div>
         <div class="stat"><strong id="statLlegaron">0</strong><span>llegaron</span></div>
         <div class="stat"><strong id="statConfirmados">0</strong><span>confirmados</span></div>
       </div>
@@ -78,7 +78,7 @@
     </div>
     <div id="tablesFloor" class="tables-floor"></div>
     <p id="emptyTables" class="empty-state hidden">
-      Todavía no hay mesas creadas.<br>Impórtalas desde tu lista o agrega una manualmente.
+      Todavía no hay mesas ni filas creadas.<br>Impórtalas desde tu lista o agrega una manualmente.
     </p>
   </section>
 
@@ -152,7 +152,7 @@
 
 <nav class="tabbar">
   <button class="tab-btn active" data-view="invitados"><span>👥</span>Invitados</button>
-  <button class="tab-btn" data-view="mesas"><span>🔘</span>Mesas</button>
+  <button class="tab-btn" data-view="mesas"><span>🔘</span>Mesas/Filas</button>
   <button class="tab-btn" data-view="importar"><span>📥</span>Importar</button>
 </nav>
 
@@ -388,7 +388,7 @@
       <span class="share-option-icon">📄</span>
       <span class="share-option-text">
         <strong>Resumen en PDF</strong>
-        <small>Nombre del evento, fecha, lugar, todas las mesas e invitados — listo para imprimir o enviar</small>
+        <small>Nombre del evento, fecha, lugar, todas las mesas/filas e invitados — listo para imprimir o enviar</small>
       </span>
     </button>
     <button id="btnGenerateCsv" class="share-option-btn">

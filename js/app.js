@@ -558,7 +558,7 @@
       if (ev.hora) subtitle += (subtitle ? ', ' : '') + ev.hora;
       if (ev.lugar) subtitle += (subtitle ? ' — ' : '') + ev.lugar;
       if (subtitle) { doc.text(subtitle, marginX, y); y += 18; }
-      doc.text(`${DB.guests.length} invitados · ${tables.length} mesas`, marginX, y); y += 26;
+      doc.text(`${DB.guests.length} invitados · ${tables.length} mesas/filas`, marginX, y); y += 26;
       doc.setTextColor(0);
 
       function printGuestLine(g, i, x) {
@@ -688,7 +688,7 @@
     const tables = DB.tables.slice().sort((a, b) => a.name.localeCompare(b.name, 'es', { numeric: true }));
     const area = $('#printArea');
     let html = `<div class="print-title">${escapeAttr(ev.name || 'Mi evento')}</div>`;
-    html += `<div class="print-subtitle">${ev.date ? new Date(ev.date + 'T00:00').toLocaleDateString('es-DO', { day: 'numeric', month: 'long', year: 'numeric' }) : ''}${ev.lugar ? ' — ' + escapeAttr(ev.lugar) : ''} — ${DB.guests.length} invitados, ${tables.length} mesas</div>`;
+    html += `<div class="print-subtitle">${ev.date ? new Date(ev.date + 'T00:00').toLocaleDateString('es-DO', { day: 'numeric', month: 'long', year: 'numeric' }) : ''}${ev.lugar ? ' — ' + escapeAttr(ev.lugar) : ''} — ${DB.guests.length} invitados, ${tables.length} mesas/filas</div>`;
     tables.forEach(t => {
       const guests = DB.guestsInTable(t.name).sort((a, b) => a.nombre.localeCompare(b.nombre, 'es'));
       html += `<div class="print-table"><h3>${escapeAttr(t.name)}${t.etiqueta ? ' — ' + escapeAttr(t.etiqueta) : ''}</h3>`;
@@ -742,23 +742,23 @@
     const capacidad = $('#newTableCapacity').value.trim();
     const etiqueta = $('#newTableLabel').value.trim();
     const tipo = $('#newTableTipo').value;
-    if (!name) { toast('Escribe un nombre para la mesa'); return; }
+    if (!name) { toast('Escribe un nombre para la mesa/fila'); return; }
     if (tipo === 'fila' && !capacidad) { toast('Escribe cuántos asientos tiene la fila'); return; }
     if (editingTableId) DB.updateTable(editingTableId, name, capacidad, etiqueta, tipo);
     else DB.addTable(name, capacidad, etiqueta, tipo);
     $('#modalTable').classList.add('hidden');
     renderAll();
-    toast('Mesa guardada');
+    toast('Mesa/Fila guardada');
   });
   $('#btnDeleteTable').addEventListener('click', () => {
     if (!editingTableId) return;
     const t = DB.tables.find(x => x.id === editingTableId);
-    if (confirm(`¿Eliminar la mesa "${t.name}"? Sus invitados quedarán sin mesa asignada.`)) {
+    if (confirm(`¿Eliminar "${t.name}"? Sus invitados quedarán sin mesa/fila asignada.`)) {
       const snap = DB.snapshot();
       DB.deleteTable(editingTableId);
       $('#modalTable').classList.add('hidden');
       renderAll();
-      toast('Mesa eliminada', snap);
+      toast('Mesa/Fila eliminada', snap);
     }
   });
 
@@ -780,7 +780,7 @@
       chip.className = 'move-chip' + (isCurrent ? ' selected' : '') + (full ? ' full' : '');
       chip.textContent = avail ? `${t.name} (${avail.ocupados}/${avail.capacidad})` : t.name;
       chip.disabled = full;
-      if (full) chip.title = 'Esta mesa ya está llena';
+      if (full) chip.title = 'Esta mesa/fila ya está llena';
       chip.addEventListener('click', () => {
         $$('.move-chip').forEach(c => c.classList.remove('selected'));
         chip.classList.add('selected');
@@ -800,7 +800,7 @@
     const newTableTyped = $('#moveNewTable').value.trim();
     const chosenChip = $('.move-chip.selected');
     const mesa = newTableTyped || (chosenChip ? chosenChip.textContent.replace(/\s*\(\d+\/\d+\)$/, '') : '');
-    if (!mesa) { toast('Elige o escribe una mesa'); return; }
+    if (!mesa) { toast('Elige o escribe una mesa/fila'); return; }
     const avail = DB.tableAvailability(mesa, movingGuestId);
     if (avail && avail.llena) {
       toast(`"${mesa}" ya está llena (${avail.ocupados}/${avail.capacidad})`);
@@ -842,7 +842,7 @@
       });
       item.querySelector('.ev-delete').addEventListener('click', () => {
         if (events.length === 1) { toast('No puedes borrar tu único evento'); return; }
-        if (confirm(`¿Eliminar el evento "${ev.name}" y todos sus invitados/mesas? No se puede deshacer.`)) {
+        if (confirm(`¿Eliminar el evento "${ev.name}" y todos sus invitados/mesas/filas? No se puede deshacer.`)) {
           DB.deleteEvent(ev.id);
           renderEventsList();
           renderAll();
@@ -897,7 +897,7 @@
     toast('Evento duplicado. Actívalo desde la lista si quieres cambiarte a él.');
   });
   $('#btnClearAll').addEventListener('click', () => {
-    if (confirm('Esto borrará todos los invitados y mesas de ESTE evento (no de tus otros eventos guardados). ¿Continuar?')) {
+    if (confirm('Esto borrará todos los invitados y mesas/filas de ESTE evento (no de tus otros eventos guardados). ¿Continuar?')) {
       DB.clearAll();
       $('#modalSettings').classList.add('hidden');
       renderAll();
@@ -1122,8 +1122,8 @@
     const overbooked = DB.overbookedTables();
     if (overbooked.length) {
       const lines = overbooked.slice(0, 5).map(o => `• ${o.table.name}: ${o.ocupados}/${o.table.capacidad}`).join('\n');
-      const extra = overbooked.length > 5 ? `\n…y ${overbooked.length - 5} mesa(s) más` : '';
-      alert(`Se importaron ${rows.length} invitado(s), pero algunas mesas quedaron con más gente de la que les cabe:\n\n${lines}${extra}\n\nAjusta la capacidad de esas mesas o mueve invitados a otra mesa desde la pestaña Mesas.`);
+      const extra = overbooked.length > 5 ? `\n…y ${overbooked.length - 5} mesa(s)/fila(s) más` : '';
+      alert(`Se importaron ${rows.length} invitado(s), pero algunas mesas/filas quedaron con más gente de la que les cabe:\n\n${lines}${extra}\n\nAjusta la capacidad desde la pestaña Mesas/Filas o mueve invitados a otra mesa/fila.`);
     } else {
       toast(`${rows.length} invitado${rows.length === 1 ? '' : 's'} importado${rows.length === 1 ? '' : 's'}`);
     }
